@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__engram__*"
+    ]
+  },
+  "model": "sonnet",
+  "effortLevel": "medium",
+  "theme": "dark"
+}

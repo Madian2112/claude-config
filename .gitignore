@@ -1,0 +1,44 @@
+# ==========================================
+# CREDENCIALES Y DATOS SENSIBLES
+# ==========================================
+.credentials.json
+session-env/
+session-state/
+sessions/
+shell-snapshots/
+
+# ==========================================
+# CACHÉ, BACKUPS Y ARCHIVOS TEMPORALES
+# ==========================================
+backups/
+cache/
+paste-cache/
+file-history/
+jobs/
+telemetry/
+.last-cleanup
+
+# ==========================================
+# LOGS E HISTORIAL DE CONVERSACIÓN
+# ==========================================
+*.log
+daemon.log
+history.jsonl
+
+# ==========================================
+# ARCHIVOS DE CONFIGURACIÓN DEL SISTEMA / IDE
+# ==========================================
+# .claude.json suele contener tokens o estados locales
+.claude.json
+ide/
+daemon/
+
+# ==========================================
+# OPCIONAL: AJUSTES DE USUARIO / PROYECTOS
+# ==========================================
+# Descomenta si 'projects/' contiene rutas absolutas o datos locales
+# projects/
+projects/
+
+# Descomenta si 'settings.json' guarda tokens o paths locales específicos de tu máquina
+# settings.json
