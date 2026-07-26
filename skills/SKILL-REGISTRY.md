@@ -1,8 +1,18 @@
 # Skill Registry — Stack C# / Angular
 
 **Solo para el orquestador.** El `dev-orchestrator` (y cualquier subagente que a su vez delegue)
-lee este registry para resolver compact rules e inyectarlas en el prompt de invocación.
-Los sub-agentes `sdd-*` NO leen este registry — reciben las reglas pre-digeridas.
+lee este registry para resolver compact rules de **skills de STACK** e inyectarlas en el prompt de
+invocación. Los sub-agentes `sdd-*` NO leen este registry — reciben las reglas pre-digeridas.
+
+> ⚠️ **Dos canales distintos, no los mezcles:**
+>
+> | Tipo de skill | Cómo llega al sub-agente | Por qué |
+> |---|---|---|
+> | **Stack** (`cc-*`, `csharp-*`, `angular-*`, `sql-*`, `typescript-*`, `dotnet-*`, `efcore-*`) | El orquestador las resuelve de este registry e inyecta las compact rules en el prompt | Dependen de la tecnología del change: no se pueden fijar de antemano |
+> | **Metodología** (`sdd-*-protocol`) | Precargadas vía el campo `skills:` del frontmatter de cada `sdd-*.md` | Son agnósticas de stack: definen CÓMO trabaja cada fase, no qué tecnología usa |
+>
+> Las skills de stack además declaran `paths:`, así que se autoactivan al tocar archivos que
+> matcheen aunque nadie las inyecte. La inyección del orquestador es el refuerzo, no el único canal.
 
 > Las skills específicas de un proyecto puntual (ej. un `angular-new-feature` propio de un repo
 > Angular, o skills de dominio de una app concreta) no viven en este registry global — si se
@@ -28,6 +38,32 @@ Los sub-agentes `sdd-*` NO leen este registry — reciben las reglas pre-digerid
 | Domain Service, DomainService, validar lógica de negocio, lógica pura sin I/O, coordinación entre entidades o DTOs, validación cruzada, cuándo crear un domain service | cc-domain-services | `~/.claude/skills/cc-domain-services/SKILL.md` |
 | XSS, CSRF, CSP, OWASP, tokens JWT, cookies httpOnly, Core Web Vitals, skeleton screens, optimistic UI, seguridad frontend | frontend-security-performance | `~/.claude/skills/frontend-security-performance/SKILL.md` |
 | Tipos complejos TypeScript, ReturnType, generics, utility types, as const, type guards, satisfies, discriminated unions | typescript-advanced | `~/.claude/skills/typescript-advanced/SKILL.md` |
+| Endpoint nuevo, JWT del lado servidor, authorization policy, IDOR, SQL injection, mass assignment, secretos, manejo de excepciones en API | dotnet-api-security | `~/.claude/skills/dotnet-api-security/SKILL.md` |
+| Repositorio, query LINQ, EF Core, Dapper, N+1, AsNoTracking, paginado, migraciones, performance de consultas | efcore-data-access | `~/.claude/skills/efcore-data-access/SKILL.md` |
+
+## Skills de Metodología (NO se inyectan por prompt)
+
+Precargadas vía el campo `skills:` del frontmatter de cada sub-agente. Listadas acá solo como
+referencia humana — el orquestador **no** las resuelve ni las copia.
+
+| Skill | La precarga | Qué define |
+|-------|-------------|------------|
+| `sdd-verification-protocol` | `sdd-verify` | Matriz de compliance, clasificación de hallazgos, veredicto, escalamiento a Judgment Day |
+| `sdd-design-protocol` | `sdd-design` | Cómo documentar decisiones (elegido + rechazado), tabla de archivos, cuándo va diagrama |
+| `sdd-spec-protocol` | `sdd-spec` | RFC 2119 con intención, Given/When/Then verificable, cobertura mínima |
+| `sdd-artifact-protocol` | **todos** los `sdd-*` + orquestador | `state.md`, `Assumptions & Open Questions`, persistencia y recovery |
+
+## Skills Invocables por el Usuario (`/comando`)
+
+No se auto-cargan (`disable-model-invocation: true`) — las disparás vos.
+
+| Comando | Qué hace |
+|---------|----------|
+| `/sdd-status` | Estado del flujo SDD del proyecto: changes abiertos, fase, progreso de tasks, preguntas pendientes |
+| `/arch-review` | Auditoría de Clean Architecture sobre el diff actual, con severidades y regla violada |
+| `/workshop-material` | Material de taller a partir de las skills del ecosistema |
+| `/tdd` | Ciclo estricto red-green-refactor con gates (verifica primero que haya harness de tests) |
+| `/graphify` | Knowledge graph navegable del codebase |
 
 ## User Skills — Foundation (Workflow / Meta)
 
@@ -192,12 +228,38 @@ sub-agente como `## Project Standards (auto-resolved)`.
 - NUNCA `any` — `unknown` + type guard cuando el tipo es genuinamente desconocido
 
 ### branch-pr
-- TODO PR DEBE linkear un issue aprobado (`status:approved`) — sin excepciones
-- TODO PR DEBE tener exactamente UN label `type:*` (feat, fix, chore, docs, etc.)
+- El agente NUNCA ejecuta `git commit/push/merge/rebase/cherry-pick` en repos de proyecto — prepara el working tree y el humano ejecuta (bloqueado por el hook `git-guard.js`)
 - Branch naming: `^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)/[a-z0-9._-]+$`
-- Conventional commits obligatorio: `type(scope): subject` — sin AI attribution / Co-Authored-By
-- El usuario hace el push y abre el PR — el agente NO ejecuta `git commit/push/PR create`
-- Antes del PR: validar que los checks automatizados (lint, tests, format) pasan localmente
+- Conventional commits obligatorio: `type(scope): subject` en imperativo, ≤72 chars — sin AI attribution / Co-Authored-By
+- Un commit = un cambio coherente; si el asunto necesita "y", son dos commits
+- El cuerpo del commit explica el POR QUÉ, no el qué (el qué ya está en el diff)
+- Antes de entregar: diff revisado sin código comentado ni secretos, formato aplicado, tests en verde si existen
+- Entregar siempre: resumen + archivos por responsabilidad + mensaje de commit propuesto + lo que quedó fuera de scope
+
+### dotnet-api-security
+- JWT: `ValidateIssuer` + `ValidateAudience` + `ValidateLifetime` SIEMPRE explícitos en `true`; `ClockSkew` ≤ 1 min (el default son 5 minutos de gracia)
+- El identificador del propietario (usuario/sucursal/empresa) sale SIEMPRE del token, NUNCA de un parámetro del request
+- El filtro de pertenencia va DENTRO de la query, no como `if` después de traer el dato — recurso ajeno responde 404, nunca 403 (un 403 confirma que el ID existe)
+- `[Authorize(Policy = ...)]` con constantes nombradas, nunca `[Authorize]` pelado; endpoints públicos con `[AllowAnonymous]` explícito
+- NUNCA concatenar ni interpolar en `FromSqlRaw`/`ExecuteSqlRaw`/`CommandText` — usar parámetros, o `FromSqlInterpolated` (que sí parametriza)
+- Nombres de tabla/columna no se parametrizan: si vienen del cliente, mapear con `enum` + switch expression
+- NUNCA recibir una entidad de dominio en el body — DTO con solo los campos editables (mass assignment)
+- NUNCA devolver `ex.Message`/`ex.StackTrace` al cliente: detalle al log con `LogError`, mensaje genérico desde `Mensajes.cs`
+- Login: mismo mensaje para "usuario inexistente" y "contraseña incorrecta" (enumeración de usuarios)
+- Secreto hardcodeado detectado → PARAR y avisar; un secreto que estuvo en git ya está comprometido y hay que rotarlo
+
+### efcore-data-access
+- Lazy loading DESHABILITADO — es la causa raíz del N+1 y es invisible al leer el código
+- Un `foreach` sobre entidades que accede a una propiedad de navegación es SIEMPRE sospechoso de N+1
+- Toda query de solo lectura lleva `AsNoTracking()` (redundante si ya proyectás a DTO con `Select()`)
+- El repositorio NUNCA devuelve `IQueryable` — retorna `List<T>`, `T`, `bool` o `null` (fuga de abstracción)
+- Proyectar con `Select()` a DTO en vez de traer la entidad completa
+- Propagar `CancellationToken` en TODAS las llamadas async de EF
+- Listados: tope máximo del SERVIDOR (no del cliente) + `OrderBy` con desempate por clave única (sin ORDER BY, `Skip/Take` no es determinístico)
+- Existencia con `AnyAsync()`, nunca `CountAsync() > 0` ni `FirstOrDefaultAsync() != null`
+- No envolver un solo `SaveChangesAsync` en transacción explícita — ya es atómico; nada de HTTP ni mails dentro de una transacción
+- Bajar a Dapper solo con perfilado que lo justifique, siempre parametrizado y dentro de Infrastructure
+- Migración generada = migración revisada; el SQL también cumple `sql-standards` (`VARCHAR`, constraints con nombre)
 
 ### issue-creation
 - Issues en blanco DESHABILITADOS — usar template (Bug Report o Feature Request)
@@ -259,6 +321,8 @@ El orquestador usa esta tabla para decidir qué compact rules inyectar en cada s
 | `sdd-design` (frontend Angular) | `angular-core` + `angular-performance` + `typescript-advanced` |
 | `sdd-tasks` | _(ninguna — agregador organizativo)_ |
 | `sdd-apply` (backend C#) | `cc-architecture` + `cc-solid` + `cc-complexity` + `csharp-coding-standards` + `csharp-concurrency-patterns` + `cc-domain-services` |
+| `sdd-apply` (backend C# con endpoint nuevo o auth) | lo anterior + `dotnet-api-security` |
+| `sdd-apply` (backend C# con acceso a datos) | lo anterior + `efcore-data-access` |
 | `sdd-apply` (frontend Angular) | `angular-core` + `angular-performance` + `typescript-advanced` |
 | `sdd-apply` (frontend Angular con auth) | `angular-core` + `angular-performance` + `angular-interceptors-auth` + `typescript-advanced` |
 | `sdd-verify` (backend C#) | `cc-complexity` + `cc-naming` |
@@ -271,7 +335,9 @@ El orquestador usa esta tabla para decidir qué compact rules inyectar en cada s
 | Angular auth / interceptors | `angular-interceptors-auth` + `angular-core` + `frontend-security-performance` |
 | Seguridad frontend / performance Angular | `frontend-security-performance` + `angular-core` + `angular-performance` |
 | TypeScript avanzado / tipado | `typescript-advanced` + `angular-core` |
-| New API endpoint | `cc-architecture` + `cc-solid` + `cc-naming` + `cc-domain-services` |
+| New API endpoint | `cc-architecture` + `cc-solid` + `cc-naming` + `cc-domain-services` + `dotnet-api-security` |
+| Repositorio / query / performance de datos | `efcore-data-access` + `sql-standards` + `cc-architecture` |
+| Review de seguridad backend | `dotnet-api-security` + `cc-architecture` + `efcore-data-access` |
 | Async code review | `csharp-concurrency-patterns` |
 | Crear PR / preparar branch | `branch-pr` |
 | Crear issue / reportar bug | `issue-creation` |

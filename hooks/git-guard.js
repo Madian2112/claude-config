@@ -11,8 +11,6 @@
 
 'use strict';
 
-const path = require('path');
-const os = require('os');
 
 const CHUNKS = [];
 process.stdin.on('data', (c) => CHUNKS.push(c));
@@ -29,10 +27,14 @@ function main(payload) {
   if (!cmd.trim()) process.exit(0);
 
   const cwd = (payload.cwd || process.cwd()).replace(/\\/g, '/').toLowerCase();
-  const configDir = path.join(os.homedir(), '.claude').replace(/\\/g, '/').toLowerCase();
 
   // El repo de configuracion queda exento (ahi si trabajamos con git normalmente).
-  const isConfigRepo = cwd.startsWith(configDir) || /claude-config/.test(cwd);
+  //
+  // OJO con comparar contra os.homedir(): en Windows devuelve "C:\Users\areyes" mientras que
+  // Git Bash reporta el cwd como "/c/Users/areyes". Comparar prefijos falla en silencio y el
+  // guard termina bloqueando el propio repo de config. Por eso matcheamos por SUFIJO de ruta,
+  // que es estable en los dos estilos.
+  const isConfigRepo = /(^|\/)\.claude(\/|$)/.test(cwd) || /(^|\/)claude-config(\/|$)/.test(cwd);
   if (isConfigRepo) process.exit(0);
 
   const match = cmd.match(/\bgit\s+(commit|push|merge|rebase|cherry-pick)\b/);
