@@ -22,8 +22,25 @@ claude mcp add --scope user engram -- engram mcp   # ver mcp/engram.json
 claude                                    # verificar que la statusline aparezca
 ```
 
-Los plugins **no** se versionan (son caché regenerable): se re-clonan solos a partir de
-`enabledPlugins` en `settings.json`.
+## Plugins — qué se versiona y qué no
+
+El objetivo es que al clonar este repo en otra máquina tengas **los mismos plugins**. Eso se logra
+versionando la **declaración**, no los archivos descargados:
+
+| Qué | Dónde | ¿Se versiona? |
+|-----|-------|---------------|
+| Qué marketplaces usás | `extraKnownMarketplaces` en `settings.json` | ✅ **Sí** — es la declaración portable |
+| Qué plugins están activos | `enabledPlugins` en `settings.json` | ✅ **Sí** — `"plugin@marketplace": true` |
+| Los repos clonados de cada marketplace | `plugins/marketplaces/` | ❌ No — caché, se re-clona sola |
+| `known_marketplaces.json` | `plugins/` | ❌ No — tiene `installLocation` con ruta absoluta de la máquina |
+
+Con las dos primeras claves versionadas, en una máquina nueva Claude Code lee `settings.json`,
+clona los marketplaces declarados e instala los plugins habilitados. **Subir los clones no ayuda**:
+la doc los trata como caché (`rm -rf ~/.claude/plugins/cache` es el fix oficial cuando se corrompen)
+y el auto-update los pisa igual.
+
+Para llenar `enabledPlugins`, corré `/plugin list --enabled` y volcá cada entrada como
+`"nombre-del-plugin@claude-plugins-official": true`.
 
 ## Estructura
 

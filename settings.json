@@ -10,6 +10,17 @@
     "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "2"
   },
 
+  "extraKnownMarketplaces": {
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
+    }
+  },
+
+  "enabledPlugins": {},
+
   "permissions": {
     "defaultMode": "default",
     "allow": [
