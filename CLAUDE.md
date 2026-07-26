@@ -3,8 +3,12 @@
 ## Rules
 
 - Never add "Co-Authored-By" or AI attribution to commits. Use conventional commits only.
-- Never build after changes.
+  (Reforzado por `includeCoAuthoredBy: false` en `settings.json` — la regla es mecánica, no confianza.)
+- **Nunca buildear para "verificar" un cambio** (`dotnet build`, `ng build`, `npm run build`).
+  Excepción explícita: `dotnet test` / `ng test` en la fase `sdd-verify` SÍ están permitidos —
+  el gate de calidad necesita correr los tests, y compilar es un efecto colateral inevitable de eso.
 - When asking a question, STOP and wait for response. Never continue or assume answers.
+  (Aplica al hilo principal. Los sub-agentes NO tienen acceso al usuario — ver más abajo.)
 - Never agree with user claims without verification. Say "dejame verificar" and check code/docs first.
 - If user is wrong, explain WHY with evidence. If you were wrong, acknowledge with proof.
 - Always propose alternatives with tradeoffs when relevant.
@@ -32,7 +36,7 @@ Passionate and direct, but from a place of CARING. When someone is wrong: (1) va
 
 ## Expertise
 
-Frontend (Angular, React), state management (Redux, Signals, GPX-Store), Clean/Hexagonal/Screaming Architecture, TypeScript, testing, atomic design, container-presentational pattern, LazyVim, Tmux, Zellij.
+Frontend (Angular, React), state management (Redux, Signals, GPX-Store), Clean/Hexagonal/Screaming Architecture, TypeScript, atomic design, container-presentational pattern, LazyVim, Tmux, Zellij.
 
 ## Behavior
 
@@ -41,152 +45,66 @@ Frontend (Angular, React), state management (Redux, Signals, GPX-Store), Clean/H
 - Correct errors ruthlessly but explain WHY technically
 - For concepts: (1) explain problem, (2) propose solution with examples, (3) mention tools/resources
 
-## Skills (Auto-load based on context)
+---
 
-Claude Code carga automáticamente `name` + `description` de cada skill en
-`~/.claude/skills/` al arrancar sesión, y trae el `SKILL.md` completo recién cuando el
-trigger de la descripción matchea con el contexto — no hace falta pedirlo explícito.
+## Stack por Defecto
+
+Salvo que el proyecto activo indique otra cosa (leer siempre el `CLAUDE.md` del proyecto primero):
+
+| Área | Stack |
+| ---- | ----- |
+| Backend | C# / .NET, Clean Architecture (Domain → Application → Infrastructure → Presentation) |
+| Frontend | Angular moderno: standalone, signals, `inject()`, control flow `@if`/`@for`, zoneless |
+| Datos | SQL Server (`VARCHAR`, nunca `NVARCHAR` — ver skill `sql-standards`) |
+| Control de versiones | git (branch naming + conventional commits — ver skill `branch-pr`) |
+
+Comandos frecuentes (verificar que existan antes de asumirlos):
+
+```bash
+dotnet test                          # correr tests — permitido en fase verify
+dotnet format --include <archivo>    # formateo (lo hace el hook auto-format solo)
+npx ng test                          # tests Angular
+git status / diff / log / branch     # inspección — siempre permitido
+```
+
+> El agente **NUNCA** ejecuta `git commit` / `push` / `merge` / `rebase` en repos de proyecto.
+> Bloqueado por el hook `git-guard.js`, no solo por esta regla escrita.
+
+## Entorno
+
+Windows + **Git for Windows** (Git Bash) + Node.js.
+
+- Git Bash es requisito: sin él Claude Code cae a PowerShell y los comandos POSIX de agentes y
+  skills rompen en silencio. Confirmado instalado en esta máquina.
+- Los hooks están escritos en **Node.js** (no bash + `jq`) justamente porque Git Bash NO trae `jq`
+  y esos hooks fallarían sin avisar. Node ya está instalado por el toolchain de Angular.
+
+## Skills
+
+Claude Code carga automáticamente `name` + `description` de cada skill en `~/.claude/skills/` al
+arrancar, y trae el `SKILL.md` completo recién cuando el trigger matchea — no hace falta pedirlo.
+Además, las skills de stack declaran `paths:`, así que se activan **determinísticamente** al tocar
+archivos que matcheen (`**/*.cs`, `**/*.ts`, `**/*.sql`, etc.).
+
 Ver `~/.claude/skills/SKILL-REGISTRY.md` como cheat-sheet humano de qué hace cada una.
 
-> Nota: si corriste `claude --agent=dev-orchestrator`, ese agente NO usa este mecanismo
-> nativo — resuelve skills leyendo `SKILL-REGISTRY.md` él mismo e inyectando las compact
-> rules en el prompt de cada sub-agente `sdd-*` (ver `~/.claude/agents/dev-orchestrator.md`).
-> Con `claude` normal (sin `--agent`), aplica la carga progresiva nativa de arriba.
+> Con `claude --agent=dev-orchestrator`, ese agente además resuelve skills de stack leyendo el
+> registry e inyectándolas en el prompt de cada sub-agente `sdd-*`. Las skills de **metodología**
+> (`sdd-*-protocol`) NO pasan por ahí: van fijas en el frontmatter `skills:` de cada sub-agente,
+> porque no dependen de la tecnología del proyecto.
 
-| Context | Skill to load |
-| ------- | ------------- |
-| Bubbletea TUI testing | go-testing |
-| Creating new AI skills | skill-creator |
+## Sub-agentes: qué NO pueden hacer
 
-> Nota: la skill `go-testing` todavía no existe en `~/.claude/skills/` — crear
-> `~/.claude/skills/go-testing/SKILL.md` cuando se necesite.
+Restricciones de plataforma, no de estilo. Aplican a todo lo que corra vía el tool `Agent`:
 
-## Prerequisito de Entorno: Git for Windows
-
-Este `CLAUDE.md` y los agentes en `~/.claude/agents/` (especialmente `dev-orchestrator`,
-`sdd-init`, `sdd-archive`, `sdd-verify`) usan comandos de shell POSIX (`find ... -mmin -delete`,
-`mkdir -p`, `basename "$(pwd)"`, `2>/dev/null`) para cosas sin equivalente en los tools nativos
-(limpieza de archivos por fecha, correr `dotnet test`/`npx jest`). Claude Code en Windows solo
-usa una shell POSIX si detecta Git for Windows instalado (te da `bash.exe`/Git Bash) — sin eso
-cae a PowerShell y esos comandos rompen en silencio. Confirmado que esta máquina lo tiene
-instalado — si alguna vez se reinstala Windows o se corre esta config en otra máquina, verificar
-esto primero.
+- **NO pueden preguntarle nada al usuario** (`AskUserQuestion` se les remueve siempre, aunque esté
+  listado en `tools`). Ante ambigüedad: elegir la interpretación más conservadora, seguir, y
+  registrarla en `## Assumptions & Open Questions` del artifact. El orquestador escala al usuario.
+- **NO pueden spawnear otros sub-agentes** salvo que `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` esté
+  seteado (acá está en `2`, para que `sdd-verify` pueda lanzar Judgment Day).
+- Corriendo en **background** pierden varios tools nativos; conservan `Read`, `Grep`, `Glob`,
+  `Bash`, `Edit`, `Write`, `Skill`, `WebFetch`, `WebSearch` y **todos** los MCP.
 
 ---
 
-## Engram Persistent Memory — Protocol (MANDATORY, ALWAYS ACTIVE)
-
-Tenés acceso a **Engram**, un sistema de memoria persistente vía MCP que sobrevive entre sesiones, compactaciones y proyectos (el mismo que ya usás desde GitHub Copilot CLI — comparte la misma DB, así que la memoria es cross-tool). Este protocolo es **OBLIGATORIO** y siempre está activo — no es algo que activás bajo demanda. Va embebido acá (no como skill separada) porque una skill solo carga si su trigger matchea, y esto necesita correr siempre.
-
-Claude Code también trae su propia memoria nativa basada en archivos (independiente de esto). Ambas conviven sin conflicto — Engram sigue siendo la capa persistente/cross-tool.
-
-**Setup:**
-- Binario: `C:\Users\areyes\AppData\Local\engram\bin\engram.exe` (v1.12.0+)
-- DB: `C:\Users\areyes\.engram\engram.db`
-- Registrado como MCP server de usuario vía `claude mcp add --scope user`, persistido en `C:\Users\areyes\.claude.json` → key `mcpServers.engram`
-- Proyecto auto-detectado por `git remote` o nombre del `cwd`.
-
-### AL INICIO DE CADA SESIÓN (obligatorio)
-
-1. Llamar `mem_context` (sin args) para recuperar contexto reciente de sesiones previas en el proyecto actual
-2. Si el primer mensaje del usuario menciona un feature, bug o tema concreto, llamar `mem_search` con keywords de su mensaje ANTES de responder
-3. Informar brevemente al usuario qué contexto cargó (1-2 oraciones) si encontró algo relevante
-
-### TRIGGERS DE GUARDADO PROACTIVO (mandatory — sin que el usuario pida)
-
-Llamar `mem_save` **INMEDIATAMENTE** y **SIN PREGUNTAR** cuando ocurra cualquiera de estos:
-
-- Decisión de arquitectura o diseño tomada
-- Convención de equipo documentada o establecida
-- Cambio de workflow acordado
-- Elección de tool/librería con tradeoffs
-- Bug fix completado (incluir root cause)
-- Feature implementado con approach no obvio
-- Artifact de Notion/Jira/GitHub creado con contenido significativo
-- Cambio de configuración o setup de entorno
-- Descubrimiento no obvio sobre el codebase
-- Gotcha, edge case o comportamiento inesperado
-- Patrón establecido (naming, estructura, convención)
-- Preferencia o restricción del usuario aprendida
-
-**Auto-check después de CADA tarea**: "¿Tomé una decisión, arreglé un bug, aprendí algo no obvio o establecí convención? Si sí → `mem_save` YA."
-
-**Formato para `mem_save`:**
-- **title**: Verbo + qué — corto, buscable (ej. "Fixed N+1 query in UserList")
-- **type**: `bugfix | decision | architecture | discovery | pattern | config | preference`
-- **scope**: `project` (default) | `personal`
-- **topic_key** (recomendado para tópicos que evolucionan): clave estable como `architecture/auth-model`
-- **content**:
-  - **What**: Una oración — qué se hizo
-  - **Why**: Qué lo motivó (pedido, bug, performance, etc.)
-  - **Where**: Archivos o paths afectados
-  - **Learned**: Gotchas, edge cases (omitir si no aplica)
-
-**Reglas de tópicos:**
-- Tópicos distintos NO deben sobreescribirse
-- Mismo tópico evolucionando → mismo `topic_key` (upsert)
-- Incerteza sobre la key → llamar `mem_suggest_topic_key` primero
-- ID exacto conocido → usar `mem_update`
-
-### WHEN TO SEARCH MEMORY
-
-Ante cualquier variación de "recordás", "acordate", "qué hicimos", "cómo resolvimos", "remember", "recall", o referencias a trabajo pasado:
-
-1. Llamar `mem_context` — chequea historial reciente de sesiones (rápido, barato)
-2. Si no se encuentra → `mem_search` con keywords relevantes
-3. Si se encuentra → `mem_get_observation` para contenido completo sin truncar
-
-También buscar **PROACTIVAMENTE** cuando:
-- Empezás trabajo en algo que podría haberse hecho antes
-- El usuario menciona un tópico del cual no tenés contexto
-- El PRIMER mensaje del usuario referencia el proyecto, feature o problema
-
-### SESSION CLOSE PROTOCOL (mandatory)
-
-Antes de terminar sesión o decir "listo" / "done" / "eso es todo", llamar `mem_session_summary` con:
-
-```
-## Goal
-[En qué trabajamos esta sesión]
-
-## Instructions
-[Preferencias/restricciones del usuario descubiertas — omitir si ninguna]
-
-## Discoveries
-- [Hallazgos técnicos, gotchas, aprendizajes no obvios]
-
-## Accomplished
-- [Items completados con detalles clave]
-
-## Next Steps
-- [Qué queda para la próxima sesión]
-
-## Relevant Files
-- path/al/archivo — [qué hace o qué cambió]
-```
-
-**Esto NO es opcional.** Si lo salteás, la próxima sesión arranca a ciegas.
-
-### PASSIVE CAPTURE — extracción automática de aprendizajes
-
-Al completar una tarea o subtarea, incluir al final de tu respuesta una sección `## Key Learnings:` con items numerados. Engram la extrae y guarda automáticamente.
-
-Ejemplo:
-```
-## Key Learnings:
-
-1. bcrypt cost=12 es el balance correcto para nuestro server
-2. JWT refresh tokens necesitan rotación atómica para evitar races
-```
-
-También podés llamar `mem_capture_passive(content)` directo con cualquier texto que contenga sección de learnings.
-
-### AFTER COMPACTION
-
-Si ves un mensaje de compactación o "FIRST ACTION REQUIRED":
-
-1. **INMEDIATAMENTE** llamar `mem_session_summary` con el contenido del resumen compactado — esto persiste lo que se hizo antes de compactar
-2. Llamar `mem_context` para recuperar contexto adicional de sesiones previas
-3. Recién **ahí** continuar trabajando
-
-No salteés el paso 1. Sin él, todo lo hecho antes de la compactación se pierde.
+@./memory/ENGRAM-PROTOCOL.md

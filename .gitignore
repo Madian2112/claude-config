@@ -42,3 +42,13 @@ projects/
 
 # Descomenta si 'settings.json' guarda tokens o paths locales específicos de tu máquina
 # settings.json
+
+# ==========================================
+# PLUGINS — CACHÉ REGENERABLE DE MARKETPLACES
+# ==========================================
+# Claude Code clona los marketplaces acá solo. Es caché de máquina, NO configuración:
+# se regenera a partir de `enabledPlugins` en settings.json. Versionarlo mete cientos
+# de archivos ajenos en los diffs y tapa los cambios propios.
+plugins/marketplaces/
+plugins/repos/
+plugins/cache/

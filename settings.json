@@ -1,10 +1,149 @@
 {
-  "permissions": {
-    "allow": [
-      "mcp__engram__*"
-    ]
-  },
   "model": "sonnet",
   "effortLevel": "medium",
-  "theme": "dark"
+  "theme": "dark",
+  "includeCoAuthoredBy": false,
+  "alwaysThinkingEnabled": true,
+  "enableAllProjectMcpServers": true,
+
+  "env": {
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "2"
+  },
+
+  "permissions": {
+    "defaultMode": "default",
+    "allow": [
+      "mcp__engram__*",
+      "Read(**/*.cs)",
+      "Read(**/*.ts)",
+      "Read(**/*.html)",
+      "Read(**/*.scss)",
+      "Read(**/*.sql)",
+      "Read(**/*.csproj)",
+      "Read(**/*.sln)",
+      "Bash(git status)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet format:*)",
+      "Bash(npx ng test:*)",
+      "Bash(npx prettier:*)",
+      "Bash(npx eslint:*)"
+    ],
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git merge:*)",
+      "Bash(git rebase:*)",
+      "Bash(git checkout:*)",
+      "Bash(dotnet ef database update:*)",
+      "Bash(dotnet ef migrations remove:*)",
+      "Write(**/*.csproj)",
+      "Edit(**/*.csproj)",
+      "Write(**/*.sln)",
+      "Edit(**/*.sln)",
+      "Write(**/appsettings*.json)",
+      "Edit(**/appsettings*.json)",
+      "Write(**/angular.json)",
+      "Edit(**/angular.json)",
+      "Write(**/package.json)",
+      "Edit(**/package.json)",
+      "Write(**/tsconfig*.json)",
+      "Edit(**/tsconfig*.json)",
+      "Write(**/*.yml)",
+      "Edit(**/*.yml)",
+      "Write(**/*.yaml)",
+      "Edit(**/*.yaml)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/appsettings.Development.json)",
+      "Read(**/appsettings.Production.json)",
+      "Read(**/appsettings.Local.json)",
+      "Read(**/secrets/**)",
+      "Read(**/*.pfx)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/*.publishsettings)",
+      "Read(**/.git/config)",
+      "Read(**/id_rsa)",
+      "Read(**/.npmrc)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean -fd:*)"
+    ]
+  },
+
+  "statusLine": {
+    "type": "command",
+    "command": "node \"$HOME/.claude/hooks/statusline.js\""
+  },
+
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/session-bootstrap.js\"",
+            "timeout": 15,
+            "statusMessage": "Bootstrap de sesion (cleanup + estado SDD)..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/clean-arch-guard.js\"",
+            "timeout": 10,
+            "statusMessage": "Validando dependencias de capas..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/git-guard.js\"",
+            "timeout": 10,
+            "statusMessage": "Validando comando git..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/auto-format.js\"",
+            "timeout": 60,
+            "statusMessage": "Formateando archivo..."
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/subagent-index.js\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
 }
