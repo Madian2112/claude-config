@@ -55,7 +55,7 @@ tipo(scope): asunto en imperativo
 ```
 feat(vales): validar limite diario por sucursal
 fix(auth): persistir el token nuevo despues del refresh
-refactor(facturacion): extraer ValeDomainService del AppService
+refactor(ventas): extraer ValeDomainService del AppService
 ```
 
 **Reglas:**

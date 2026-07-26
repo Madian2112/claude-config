@@ -92,10 +92,10 @@ public class FiltrosDto
 
 ```csharp
 // ❌ MAL — el frontend envía el nombre de la columna de DB
-// URL: api/productos?ordenCampo=prod_Desc&ordenDescendente=true
+// URL: api/articulos?ordenCampo=art_Desc&ordenDescendente=true
 public class FiltrosDto
 {
-    public string? OrdenCampo { get; set; } // "prod_Desc", "prod_Precio"
+    public string? OrdenCampo { get; set; } // "art_Desc", "art_Precio"
 }
 
 // ✅ BIEN — enum con nombres semánticos, validación automática del framework
@@ -109,8 +109,8 @@ public class FiltrosDto
 
 **Reglas:**
 - Para conjuntos cerrados de opciones (sort, filter fields, status): usar `enum` — el model binding de ASP.NET valida automáticamente y devuelve 400 en valores inválidos
-- Los nombres del enum deben ser semánticos y en PascalCase (`Descripcion`, `Precio`, `FechaCreacion`), NUNCA reflejar el naming de la DB (`prod_Desc`, `prd_precio`, `fecha_cre`)
-- Si se detecta un string que coincide con un naming de DB (prefijos como `prod_`, `usr_`, `tbl_`, underscores estilo SQL), refactorizar inmediatamente a enum o constante semántica
+- Los nombres del enum deben ser semánticos y en PascalCase (`Descripcion`, `Precio`, `FechaCreacion`), NUNCA reflejar el naming de la DB (`art_Desc`, `art_precio`, `fecha_cre`)
+- Si se detecta un string con forma de nombre de columna (prefijo corto + underscore, tipo `xxx_campo`, o cualquier underscore estilo SQL), refactorizar inmediatamente a enum o constante semántica
 - En el service, el mapping de enum → propiedad del DTO/entidad se hace con switch expression
 
 ## 5. Repository Pattern — Responsabilidad Única: Acceso a Datos

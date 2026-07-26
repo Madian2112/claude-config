@@ -92,7 +92,7 @@ sub-agente como `## Project Standards (auto-resolved)`.
 - NUNCA strings literales hardcodeados en services — todos los mensajes van en `Common/Mensajes.cs` (static class `public const string`); si no existe en la API, crearla; usar `string.Format(Mensajes.Constante, param1)` para mensajes con parámetros; naming PascalCase agrupado por feature: `BonosSinDatos`, `ValesErrorCrear`
 - Todo AppService DEBE tener su interfaz `I{NombreService}` declarada en el mismo folder del service; la interfaz expone solo los métodos públicos
 - NUNCA exponer nombres de columnas, tablas o vistas de la base de datos como valores de parámetros en la API pública (query strings, body, headers) — esto es information disclosure del esquema interno; aplica especialmente a parámetros de ordenamiento (`orderBy`, `ordenCampo`, `sortBy`), filtrado y proyección
-- Para conjuntos cerrados de opciones (sort fields, filter fields, status): usar `enum` con nombres semánticos PascalCase (`Descripcion`, `Precio`), NUNCA naming de DB (`prod_Desc`, `prd_precio`); si se detecta un string con prefijos estilo DB (`prod_`, `usr_`, `tbl_`) o underscores SQL, refactorizar inmediatamente a enum
+- Para conjuntos cerrados de opciones (sort fields, filter fields, status): usar `enum` con nombres semánticos PascalCase (`Descripcion`, `Precio`), NUNCA naming de DB (`art_Desc`, `art_precio`); si se detecta un string con forma de columna (prefijo corto + underscore, tipo `xxx_campo`) o underscores SQL, refactorizar inmediatamente a enum
 
 ### cc-complexity
 - Complejidad ciclomática máxima de 10 por método; refactorizar si supera ese umbral

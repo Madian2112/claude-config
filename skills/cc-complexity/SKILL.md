@@ -58,8 +58,8 @@ Así bajás la complejidad cognitiva real (el cuerpo pesado sale del bucle) sin 
 control. Aplicar la regla genérica sin esta excepción produce código que no compila o que cambia
 de comportamiento en silencio, que es peor que el método largo original.
 
-> Origen: reportado por `sdd-apply` sobre `FrmAgregarFacturas.vb` (change fase3-pasos-4-5,
-> 2026-07-23). La regla general asumía código estructurado sin saltos.
+> Origen: reportado por `sdd-apply` al refactorizar un formulario VB.NET legacy con `GoTo` y
+> `Continue For`. La regla general asumía código estructurado sin saltos.
 
 ## 4. Merge de If Statements (SonarQube S1066)
 - NUNCA escribir un `if` dentro de otro `if` cuando ambas condiciones pueden unirse con `&&`.
@@ -74,5 +74,5 @@ de comportamiento en silencio, que es peor que el método largo original.
   - Propiedades `public required {Interface} Nombre { get; init; }`
   - Registrar en DI con factory lambda: `services.AddTransient(sp => new XOptions { Prop = sp.GetRequiredService<I...>() })`
   - El service recibe UN solo parámetro `Options` en su constructor.
-- Patrón de referencia: `FacturacionAppServiceOptions` en ERP Facturación.
+- Naming del patrón: `{NombreDelService}Options`, en el mismo folder que el service.
 - DomainServices que son stateless y sin dependencias: instanciar con `new()` en field declaration, NO inyectar por constructor.
