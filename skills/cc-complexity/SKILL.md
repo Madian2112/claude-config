@@ -1,6 +1,7 @@
 ---
 name: cc-complexity
 description: Reglas para evaluar y reducir la complejidad ciclomática y cognitiva del código.
+paths: "**/*.cs"
 ---
 
 # Complejidad Ciclomática y Cognitiva
@@ -22,11 +23,43 @@ description: Reglas para evaluar y reducir la complejidad ciclomática y cogniti
 - **Límite:** Mantener estrictamente por debajo de 15.
 - **Estrategia de solución:** Extraer lógicas anidadas a métodos privados descriptivos, o usar Streams/LINQ (ej. `Where().Select()`) para hacerlo más declarativo.
 
-## 3. Límites de Tamaño (NOTA DE SISTEMA IMPORTANTE)
-*Nota estricta para el agente:* Aunque la literatura mencione límites estrictos (como 20-50 líneas por método o 200 líneas por clase, o la Regla de los 30), **ESTOS LÍMITES DEBEN IGNORARSE EN LA PRÁCTICA AUTOMATIZADA**.
-- Únicamente se debe marcar como error un método si supera las **600 líneas**.
-- Únicamente se debe marcar como error una clase si supera las **1000 líneas**.
-- En cualquier otro caso, priorizar tener tests, eliminar duplicación y expresar intención.
+## 3. Límites de Tamaño — dos umbrales, NO se contradicen
+
+Hay DOS umbrales distintos porque responden a dos preguntas distintas. Leé cuál aplica antes de actuar:
+
+| Umbral | Qué es | Cuándo aplica |
+|--------|--------|---------------|
+| **600 líneas** por método / **1000** por clase | **ERROR bloqueante** | Refactor automático del agente. Por debajo de esto, el agente NO refactoriza por tamaño ni marca violación |
+| **30-40 líneas** por método (ver `csharp-refactoring`) | **SEÑAL de review**, nunca error | Code review con criterio humano, o cuando el usuario pide explícitamente revisar mantenibilidad |
+
+*Nota estricta para el agente:* aunque la literatura mencione 20-50 líneas por método o la Regla
+de los 30, **esos números NO son criterio de bloqueo automático**. Un método de 80 líneas lineales
+y legibles no es un bug: refactorizarlo sin que nadie lo pida es ruido en el diff y riesgo gratis.
+
+- Por debajo de 600/1000: priorizar eliminar duplicación y expresar intención, no cortar por largo.
+- La complejidad **ciclomática (§1) y cognitiva (§2) SÍ son criterio de bloqueo** en sus umbrales.
+  El tamaño en líneas es la métrica más pobre de las tres — por eso tiene el umbral más laxo.
+
+## 3.b Código legacy con saltos no estructurados (VB.NET, `GoTo`, `Continue For`)
+
+`GoTo`, `Continue For` y `Exit For` **no cruzan procedimientos**. Por eso, en código legacy, la
+regla "extraé el método" tiene un límite físico: si extraés un bucle `For` que adentro tiene
+`Continue For` o `GoTo escape`, rompés la semántica — no hay forma de expresar ese salto desde un
+helper.
+
+**Estrategia correcta:**
+
+- El bucle `For` **queda in situ** dentro del método original. No lo extraigas.
+- Extraé el **CUERPO de la iteración** a un helper que devuelva un flag (`Boolean` o enum) señalando
+  continuar / abortar.
+- El call site evalúa ese retorno y ejecuta ahí el `Continue For` / `Exit For` / rollback.
+
+Así bajás la complejidad cognitiva real (el cuerpo pesado sale del bucle) sin tocar el flujo de
+control. Aplicar la regla genérica sin esta excepción produce código que no compila o que cambia
+de comportamiento en silencio, que es peor que el método largo original.
+
+> Origen: reportado por `sdd-apply` sobre `FrmAgregarFacturas.vb` (change fase3-pasos-4-5,
+> 2026-07-23). La regla general asumía código estructurado sin saltos.
 
 ## 4. Merge de If Statements (SonarQube S1066)
 - NUNCA escribir un `if` dentro de otro `if` cuando ambas condiciones pueden unirse con `&&`.

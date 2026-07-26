@@ -1,6 +1,7 @@
 ---
 name: cc-solid
 description: Aplica estrictamente los principios SOLID en el diseño de clases e interfaces.
+paths: "**/*.cs"
 ---
 
 # Principios SOLID

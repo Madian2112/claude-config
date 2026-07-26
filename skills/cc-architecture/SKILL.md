@@ -1,6 +1,7 @@
 ---
 name: cc-architecture
 description: Reglas de arquitectura para Web APIs, manejo de parámetros y eliminación de números mágicos.
+paths: "**/Controllers/**/*.cs, **/Endpoints/**/*.cs, **/*Controller.cs, **/Dtos/**/*.cs"
 ---
 
 # Arquitectura y Diseño de Parámetros
@@ -66,7 +67,16 @@ public class FiltrosDto
 
 ## 2. Parámetros de Método
 - **Límite:** Máximo 3 a 4 parámetros por método.
-- Si un método requiere más de 4 parámetros, se debe refactorizar encapsulando los parámetros en una clase o record tipo *Request* u *Object Parameter*.
+- Si un método requiere más de 4 parámetros, encapsularlos en un **`public class` con sufijo `Dto`**
+  y propiedades `{ get; set; }`.
+  - Ubicación: `Features/{Feature}/{SubFeature}/Dtos/` — **un archivo por clase**, NUNCA dentro del
+    archivo del service.
+  - **NUNCA `record`** para DTOs, y **NUNCA** los sufijos `*Request` / `*Response` / `*Params` /
+    `*Model` / `*Input`. Ver §1.2 de esta misma skill y `cc-naming` §2 — las tres reglas dicen
+    exactamente lo mismo, a propósito.
+- Caso aparte, **constructores**: el límite es 7 parámetros (SonarQube S107). Si un service
+  orquestador necesita más dependencias, va `{ServiceName}Options` con `required init`.
+  Ver `cc-complexity` §5.
 
 ## 3. Evitar Números Mágicos
 - Prohibido dejar valores literales ("quemados") en validaciones lógicas (ej. `if (user.Age > 18)`).

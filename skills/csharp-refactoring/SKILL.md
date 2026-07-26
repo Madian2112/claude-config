@@ -7,6 +7,7 @@ metadata:
   author: madian-velasquez
   version: "1.1"
   last_change: "Corregido checklist: reemplazado 'any' (TypeScript) por 'object'/'dynamic' (C#) en el ítem de tipado fuerte"
+paths: "**/*.cs"
 ---
 
 ## Code Smells — Cómo Detectarlos
@@ -14,7 +15,14 @@ metadata:
 > ⚠️ Los bloques de código son SOLO ILUSTRATIVOS. Adaptá los patrones al código concreto que estás analizando.
 
 ### Long Method
-**Señal:** Método de más de 30-40 líneas, comentarios que dividen secciones.
+**Señal (NO error bloqueante):** Método de más de 30-40 líneas, comentarios que dividen secciones.
+
+> ⚠️ **Alcance de este umbral.** Las 30-40 líneas son una señal de review para criterio humano,
+> **no un criterio de refactor automático**. El umbral bloqueante lo fija `cc-complexity` §3:
+> 600 líneas por método / 1000 por clase. Un método de 80 líneas legibles NO se refactoriza solo
+> porque sea largo — se refactoriza si además viola complejidad ciclomática/cognitiva o SRP.
+> Lo que importa acá es el patrón "comentarios que dividen secciones": eso SÍ delata pasos que
+> quieren ser métodos con nombre.
 ```csharp
 // ❌ Un método que hace todo
 public async Task ProcessOrder(Order order)

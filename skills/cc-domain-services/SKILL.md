@@ -9,6 +9,7 @@ license: Apache-2.0
 metadata:
   author: madian-velasquez
   version: "1.0"
+paths: "**/Domain/**/*.cs, **/Application/**/*.cs"
 ---
 
 > ⚠️ **NOTA PARA EL AGENTE:** Los bloques de código son **SOLO ILUSTRATIVOS**. Nunca copies nombres de clases, métodos o propiedades de estos ejemplos al proyecto real. Adaptá el patrón al código concreto que estás analizando o generando.

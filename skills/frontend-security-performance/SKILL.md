@@ -7,6 +7,7 @@ metadata:
   author: madian-velasquez
   version: "1.1"
   last_change: "Corregido anti-pattern en Skeleton Screen: reemplazado effect()+subscribe por toSignal() con computed(); actualizado JWT storage para alinearse con angular-interceptors-auth"
+paths: "**/*.ts, **/*.html"
 ---
 
 ## XSS — Cross-Site Scripting

@@ -6,6 +6,7 @@ description: >
 metadata:
   author: madian-velasquez
   version: "1.0"
+paths: "**/*.component.ts, **/*.routes.ts, **/app.config.ts, **/*.component.html"
 ---
 
 ## NgOptimizedImage (REQUIRED for images)

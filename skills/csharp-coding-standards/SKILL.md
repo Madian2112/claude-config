@@ -1,6 +1,7 @@
 ---
 name: csharp-coding-standards
 description: "Estándares modernos de C#: performance con Span/Memory, diseño de APIs públicas, value objects y patrones de tipos."
+paths: "**/*.cs"
 ---
 
 > ⚠️ **NOTA PARA EL AGENTE:** Los bloques de código son **SOLO ILUSTRATIVOS**. Nunca copies nombres de clases, métodos o variables de estos ejemplos al proyecto real. Adaptá siempre el patrón al código concreto que estás analizando.

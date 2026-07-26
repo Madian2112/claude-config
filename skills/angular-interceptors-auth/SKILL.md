@@ -7,6 +7,7 @@ metadata:
   author: madian-velasquez
   version: "1.1"
   last_change: "Interceptor desacoplado de localStorage — usa AuthService.getToken() para centralizar la estrategia de almacenamiento de tokens; elimina la contradicción con frontend-security-performance"
+paths: "**/*interceptor*.ts, **/*auth*.ts, **/*guard*.ts, **/app.config.ts"
 ---
 
 ## Interceptor Funcional (REQUIRED)
