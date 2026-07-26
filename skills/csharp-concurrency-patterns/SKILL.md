@@ -1,6 +1,7 @@
 ---
 name: csharp-concurrency-patterns
 description: "Patrones de concurrencia en C#/.NET: async/await correcto, CancellationToken, manejo de Tasks, y antipatrones a evitar."
+paths: "**/*.cs"
 ---
 
 > ⚠️ **NOTA PARA EL AGENTE:** Los bloques de código son **SOLO ILUSTRATIVOS**. Nunca copies nombres de clases, métodos o variables de estos ejemplos al proyecto real. Adaptá siempre el patrón al código concreto que estás analizando.

@@ -6,6 +6,7 @@ description: >
 metadata:
   author: madian-velasquez
   version: "1.0"
+paths: "**/*.component.ts, **/*.service.ts, **/app.config.ts, **/app.routes.ts"
 ---
 
 ## Standalone Components (REQUIRED)

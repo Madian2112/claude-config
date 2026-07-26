@@ -7,6 +7,7 @@ metadata:
   author: madian-velasquez
   version: "1.1"
   last_change: "Agregado satisfies operator (TS 4.9+) y NonNullable<T> a utility types; ambos frecuentes en servicios Angular que consumen APIs del ERP"
+paths: "**/*.ts"
 ---
 
 ## as const — Inmutabilidad y Tipos Literales

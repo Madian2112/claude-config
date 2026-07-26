@@ -8,6 +8,7 @@ license: Apache-2.0
 metadata:
   author: madian-velasquez
   version: "1.0"
+paths: "**/*.sql"
 ---
 
 ## When to Use

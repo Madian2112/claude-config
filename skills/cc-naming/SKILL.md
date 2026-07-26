@@ -1,6 +1,7 @@
 ---
 name: cc-naming
 description: Aplica convenciones de nombres, notaciones y estilos de formato Allman para código en C#.
+paths: "**/*.cs"
 ---
 
 # Reglas de Nombres y Formato (Clean Code)
