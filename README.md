@@ -149,3 +149,15 @@ producen código), `haiku` en init/explore/spec/tasks/archive (transformaciones 
 - **Nunca** buildear para "verificar". `dotnet test` en la fase verify sí.
 - Los sub-agentes **no pueden preguntarle nada al usuario**: registran supuestos en
   `## Assumptions & Open Questions` y el orquestador escala.
+
+## Créditos
+
+La metodología SDD (los sub-agentes por fase) y **Engram** (la memoria persistente vía MCP) están
+basadas en el trabajo de [Gentleman Programming](https://github.com/Gentleman-Programming):
+
+- [Gentleman-Programming/engram](https://github.com/Gentleman-Programming/engram) — memoria
+  persistente cross-sesión y cross-herramienta vía MCP.
+
+Lo que hay en este repo es esa base adaptada a un stack .NET + Angular: las skills de arquitectura,
+los hooks de enforcement y la resolución de reglas por stack son propias, pero el esqueleto
+conceptual del flujo por fases y la capa de memoria no salieron de la nada.
