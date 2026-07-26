@@ -70,7 +70,6 @@ No se auto-cargan (`disable-model-invocation: true`) — las disparás vos.
 | Trigger | Skill | Path |
 |---------|-------|------|
 | Crear PR, abrir pull request, preparar branch para review, naming de branches, conventional commits | branch-pr | `~/.claude/skills/branch-pr/SKILL.md` |
-| Crear issue de GitHub, reportar bug, feature request, triage de issues | issue-creation | `~/.claude/skills/issue-creation/SKILL.md` |
 | "judgment day", "review adversarial", "doble review", "que lo juzguen" — review paralelo con dos jueces independientes | judgment-day | `~/.claude/skills/judgment-day/SKILL.md` |
 | Crear nueva skill de agente, documentar patrones para AI, agregar instrucciones de agente | skill-creator | `~/.claude/skills/skill-creator/SKILL.md` |
 | ALWAYS at session start, delegación a sub-agentes, recovery de outputs, compactación de sesión | agent-output-persistence | `~/.claude/skills/agent-output-persistence/SKILL.md` |
@@ -261,14 +260,6 @@ sub-agente como `## Project Standards (auto-resolved)`.
 - Bajar a Dapper solo con perfilado que lo justifique, siempre parametrizado y dentro de Infrastructure
 - Migración generada = migración revisada; el SQL también cumple `sql-standards` (`VARCHAR`, constraints con nombre)
 
-### issue-creation
-- Issues en blanco DESHABILITADOS — usar template (Bug Report o Feature Request)
-- Buscar duplicados antes de abrir un issue nuevo
-- Cada issue arranca con `status:needs-review` automático
-- Maintainer DEBE aprobar (`status:approved`) antes de que se pueda abrir un PR linkeado
-- Preguntas → Discussions, NO issues
-- Llenar TODOS los campos requeridos del template + checkboxes pre-flight
-
 ### judgment-day
 - SIEMPRE lanzar DOS jueces en PARALELO (nunca secuencial) — vía el tool `Agent`
 - Los jueces NO se conocen entre sí (review ciego e independiente)
@@ -340,7 +331,6 @@ El orquestador usa esta tabla para decidir qué compact rules inyectar en cada s
 | Review de seguridad backend | `dotnet-api-security` + `cc-architecture` + `efcore-data-access` |
 | Async code review | `csharp-concurrency-patterns` |
 | Crear PR / preparar branch | `branch-pr` |
-| Crear issue / reportar bug | `issue-creation` |
 | Review adversarial / "judgment day" | `judgment-day` (+ las skills del stack del target) |
 | Crear nueva skill | `skill-creator` |
 | Pregunta de arquitectura / codebase nuevo / relaciones entre archivos | `graphify` |

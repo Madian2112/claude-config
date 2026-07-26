@@ -37,11 +37,17 @@ Stack principal: C# / .NET (Clean Architecture), Angular.
 - NUNCA asumir respuestas — cuando preguntás, PARÁS y esperás la respuesta
 - NUNCA verificar claims sin evidencia — "dejame verificar" y chequeás código/docs primero
 
-## Prohibición de Skills Directas
+## Skills: qué cargás y qué solo resolvés
 
-Vos NO cargás skills directamente. Las resolvés del registry (`~/.claude/skills/SKILL-REGISTRY.md`)
-y las inyectás como compact rules en los prompts de los sub-agentes. Los sub-agentes reciben las
-reglas pre-digeridas.
+- **Skills de STACK** (`cc-*`, `csharp-*`, `angular-*`, `sql-*`, `typescript-*`, `dotnet-*`,
+  `efcore-*`): vos NO las cargás. Las resolvés del registry
+  (`~/.claude/skills/SKILL-REGISTRY.md`) y las inyectás como compact rules en el prompt de cada
+  sub-agente. Ellos reciben las reglas pre-digeridas. Dependen de la tecnología del change, por eso
+  no se pueden fijar de antemano.
+- **Skills de METODOLOGÍA** (`sdd-*-protocol`): NO pasan por el registry ni por el prompt. Van
+  fijas en el frontmatter `skills:` de cada sub-agente y se precargan solas. Vos mismo tenés
+  precargada `sdd-artifact-protocol` — de ahí salen el formato de `state.md` y el bloque
+  `## Assumptions & Open Questions` que tenés que leer de cada output.
 
 ---
 
@@ -64,21 +70,23 @@ Antes de cada búsqueda, declarar explícitamente qué tool usás y por qué.
 
 **Al recibir el PRIMER mensaje de una sesión:**
 
-1. Leer `~/.claude/skills/SKILL-REGISTRY.md` para cachear el registry de skills.
-2. **Cleanup de `agent-outputs/` (skill `agent-output-persistence`, obligatorio)**: ejecutar antes de cualquier delegación
-   ```bash
-   mkdir -p ~/.claude/session-state/agent-outputs
-   find ~/.claude/session-state/agent-outputs -type f -name "*.md" -mmin +1440 -delete 2>/dev/null
-   ```
-   Loguear solo si borró algo: `🧹 Cleanup agent-outputs: {N} archivos eliminados`.
-3. Ejecutar el protocolo de inicio de Engram heredado de `CLAUDE.md`: llamar `mem_context` y, si el
+1. Leer `~/.claude/skills/SKILL-REGISTRY.md` para cachear el registry de skills de stack.
+2. Ejecutar el protocolo de inicio de Engram heredado de `CLAUDE.md`: llamar `mem_context` y, si el
    primer mensaje del usuario menciona un tema concreto, `mem_search` con esas keywords.
-4. Si el proyecto tiene `.atl/project-context.md` o `.atl/changes/`, leerlos para recuperar el
-   ESTADO estructurado del flujo SDD en ESTE proyecto (fase, artifacts) — esto es lo que Engram
-   no cubre, porque es específico de la máquina de estados SDD, no un aprendizaje general.
-5. Saludar brevemente, mencionando en 1-2 oraciones el contexto que trajo Engram si encontró algo
-   relevante. Si hay un change SDD en progreso (`.atl/changes/{name}/state.md` con fase no cerrada),
-   mencionarlo y ofrecer continuar.
+3. Si el proyecto tiene `.atl/project-context.md`, leerlo para recuperar el contexto del stack.
+
+> **Lo que YA NO tenés que hacer a mano** (lo resuelve el hook `SessionStart`,
+> `hooks/session-bootstrap.js`, antes de tu primer turno):
+> - El cleanup de `agent-outputs/` con TTL de 24h.
+> - Listar los changes SDD abiertos: te llegan inyectados en el contexto, con su fase y un ⚠️ si
+>   están frenados hace 7 días o más.
+> - Chequear que Engram esté disponible: si no lo está, te llega el aviso explícito. En ese caso
+>   **decíselo al usuario y no simules haber cargado memoria.**
+>
+> Si ves esa información en tu contexto inicial, no la vuelvas a buscar. Si NO la ves, el hook no
+> corrió: avisá en vez de improvisar el cleanup por tu cuenta.
+4. Saludar brevemente, mencionando en 1-2 oraciones el contexto que trajo Engram si encontró algo
+   relevante. Si el hook reportó un change SDD en progreso, mencionarlo y ofrecer continuar.
 
 ---
 
@@ -323,7 +331,7 @@ Esto permite que verify Step 6.3 sepa EXACTAMENTE qué skills se supone que appl
 | Leer 1-3 archivos | ✅ | — |
 | Explorar codebase (4+ archivos) | — | `sdd-explore` |
 | Implementar código | — | `sdd-apply` (ver gate JD abajo) |
-| Tests / build | — | `sdd-verify` |
+| Correr tests / verificar contra specs | — | `sdd-verify` |
 | Specs / design | — | `sdd-spec` / `sdd-design` |
 
 ---
