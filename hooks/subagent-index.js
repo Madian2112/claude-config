@@ -15,7 +15,6 @@
 'use strict';
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 
 const CHUNKS = [];
@@ -23,7 +22,8 @@ process.stdin.on('data', (c) => CHUNKS.push(c));
 process.stdin.on('end', () => {
   try {
     const p = JSON.parse(Buffer.concat(CHUNKS).toString('utf8') || '{}');
-    const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+    // Se ubica por su propia ruta, no por el home — ver session-bootstrap.js
+    const configDir = process.env.CLAUDE_CONFIG_DIR || path.resolve(__dirname, '..');
     const dir = path.join(configDir, 'session-state', 'agent-outputs');
     fs.mkdirSync(dir, { recursive: true });
 

@@ -13,11 +13,17 @@ conflicto: Engram es la capa persistente y cross-tool.
 ## Setup
 
 - Binario `engram` disponible en el `PATH` (v1.12.0+)
-- DB por defecto: `%USERPROFILE%\.engram\engram.db`
 - Registrado como MCP server de usuario (`claude mcp add --scope user`), persistido en
-  `%USERPROFILE%\.claude.json` → key `mcpServers.engram`. Ese archivo **NO se versiona**
-  (tiene tokens): la definición reproducible del server vive en `mcp/engram.json` de este repo.
+  **`.claude.json`, dentro de esta misma carpeta de configuración** (`CLAUDE_CONFIG_DIR`).
+  Ese archivo **NO se versiona** (tiene tokens): la definición reproducible del server vive en
+  `mcp/engram.json` de este repo.
+- La DB de Engram es de la herramienta Engram, no de Claude Code: su ubicación la resuelve el
+  propio binario (variable `ENGRAM_DB` si querés fijarla). **No la busques dentro de `.claude/`.**
 - Proyecto auto-detectado por `git remote` o nombre del `cwd`.
+
+> ⚠️ **Toda la configuración de Claude Code vive dentro de esta carpeta.** No salgas a buscar
+> archivos de config al home del usuario ni a rutas absolutas de la máquina. Ver README §
+> "Todo vive dentro de la carpeta de configuración".
 
 > **Si Engram no está disponible**, el hook `SessionStart` (`hooks/session-bootstrap.js`) lo
 > detecta y te lo inyecta al contexto con un aviso explícito. En ese caso: **decíselo al usuario

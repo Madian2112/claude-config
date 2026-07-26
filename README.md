@@ -3,7 +3,36 @@
 Configuración de Claude Code versionada: memoria global, sub-agentes del flujo SDD, ecosistema de
 skills, hooks de enforcement y permisos.
 
-Este repo **es** el contenido de `~/.claude`.
+Este repo **es** el contenido de la carpeta de configuración de Claude Code (`.claude`).
+
+## Todo vive dentro de la carpeta de configuración
+
+**Principio de este setup: no hay configuración de Claude Code fuera de esta carpeta.**
+Nada en el home del usuario, nada en rutas absolutas de la máquina. Un solo lugar.
+
+Esto incluye `.claude.json` — el archivo con los MCP servers registrados y el estado local — que
+por defecto Claude Code deja en el home, pero acá vive **adentro** de esta carpeta
+(vía `CLAUDE_CONFIG_DIR`). Está en `.gitignore` porque contiene tokens, no porque esté afuera.
+
+| Archivo | Dónde | Versionado |
+|---------|-------|------------|
+| `settings.json`, `CLAUDE.md`, `agents/`, `skills/`, `hooks/`, `memory/`, `mcp/` | Esta carpeta | ✅ Sí |
+| `.claude.json` (MCP registrados, estado local, tokens) | Esta carpeta | ❌ No — tiene tokens |
+| `session-state/`, `projects/`, `history.jsonl`, `plugins/marketplaces/` | Esta carpeta | ❌ No — estado y caché |
+
+> **Para el agente:** si necesitás resolver configuración, buscá **acá adentro**. No salgas al home
+> del usuario ni asumas rutas tipo `%USERPROFILE%\...` o `C:\Users\<user>\...`.
+>
+> **Única excepción**, y no es config de Claude Code: la base de datos de **Engram** pertenece a la
+> herramienta Engram y su ubicación la resuelve ese binario (variable `ENGRAM_DB`).
+
+**Los hooks se ubican solos.** Cada script resuelve la carpeta de configuración desde su propia
+ruta (`path.resolve(__dirname, '..')`), con `CLAUDE_CONFIG_DIR` como override. No dependen de
+`os.homedir()`, así que funcionan aunque muevas la carpeta.
+
+> ⚠️ Lo único que sí tiene la ruta escrita es el comando de cada hook en `settings.json`
+> (`node "$HOME/.claude/hooks/..."`). Si tu carpeta de configuración **no** está en
+> `$HOME/.claude`, actualizá esas 6 líneas para que apunten a donde la tengas.
 
 ## Requisitos
 
@@ -17,10 +46,13 @@ Este repo **es** el contenido de `~/.claude`.
 ## Bootstrap en una máquina nueva
 
 ```bash
-git clone <repo> "$HOME/.claude"          # el repo ES ~/.claude
-claude mcp add --scope user engram -- engram mcp   # ver mcp/engram.json
+git clone <repo> "$HOME/.claude"          # el repo ES la carpeta de configuracion
+claude mcp add --scope user engram -- engram mcp   # queda en .claude.json, ver mcp/engram.json
 claude                                    # verificar que la statusline aparezca
 ```
+
+Si querés la carpeta en otro lado, cloná donde quieras y apuntá `CLAUDE_CONFIG_DIR` ahí
+(recordá ajustar las rutas de los hooks en `settings.json` — ver abajo).
 
 ## Plugins — qué se versiona y qué no
 

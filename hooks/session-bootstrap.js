@@ -16,11 +16,14 @@
 'use strict';
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+// El hook vive DENTRO de la carpeta de configuracion, asi que se ubica solo:
+// <config-dir>/hooks/session-bootstrap.js  ->  <config-dir>
+// Nada de os.homedir(): toda la config vive en esta carpeta, y esa carpeta no tiene
+// por que estar en el home (CLAUDE_CONFIG_DIR puede apuntarla a cualquier lado).
+const configDir = process.env.CLAUDE_CONFIG_DIR || path.resolve(__dirname, '..');
 const outDir = path.join(configDir, 'session-state', 'agent-outputs');
 const lines = [];
 

@@ -2,8 +2,9 @@
   "$comment": [
     "Definicion reproducible del MCP server de Engram.",
     "",
-    "PROBLEMA QUE RESUELVE: el registro real vive en %USERPROFILE%\\.claude.json, que esta",
-    "(correctamente) en .gitignore porque contiene tokens. Resultado: la pieza de la que",
+    "PROBLEMA QUE RESUELVE: el registro real vive en .claude.json, dentro de esta misma carpeta",
+    "de configuracion, y ese archivo esta (correctamente) en .gitignore porque contiene tokens.",
+    "Resultado: la pieza de la que",
     "depende el protocolo OBLIGATORIO de memoria de CLAUDE.md no estaba versionada en ningun",
     "lado. Maquina nueva o reinstalacion = protocolo apuntando a un server inexistente, sin",
     "error visible.",
