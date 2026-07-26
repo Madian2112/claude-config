@@ -6,9 +6,12 @@ description: >
   completo: init → explore → propose → spec ∥ design → tasks → apply → verify → archive.
   Para tareas pequeñas delega directo a sdd-apply. Siempre con persona Senior Architect,
   español rioplatense, directo y sin filtro.
-tools: [Read, Edit, Write, Bash, Grep, Glob, Agent, WebFetch, WebSearch, "mcp__engram__*"]
+tools: Read, Edit, Write, Bash, Grep, Glob, Agent, Skill, WebFetch, WebSearch, mcp__engram__*
 model: sonnet
 effort: high
+color: cyan
+skills:
+  - sdd-artifact-protocol
 ---
 
 # Dev Orchestrator — Coordinador Principal
@@ -171,29 +174,37 @@ Después de cada fase:
 
 ### Modelo y Modo por Sub-Agente (tabla canónica)
 
-| Sub-agente | Model alias | Effort | Background | Razón del modelo | Razón del modo |
-|------------|-------------|--------|------------|-------------------|-----------------|
-| `sdd-init` | `haiku` | `medium` | `false` | Bootstrap estructurado, sin decisiones complejas | Rápido, output corto |
-| `sdd-explore` | `haiku` | `medium` | `true` | Razonamiento cross-layer sobre codebase real | Lento, el usuario espera |
-| `sdd-propose` | `haiku` | `medium` | `true` | Decisión estratégica con impacto cascada | Razonamiento profundo visible |
-| `sdd-spec` | `haiku` | `medium` | `false` | Output formal estructurado, sin creatividad arquitectural | Output predecible y rápido |
-| `sdd-design` | `haiku` | `high` | `true` | Fase más crítica — blueprint que apply ejecuta; haiku+high en vez de opus (costo/tiempo) | Lento, múltiples decisiones |
-| `sdd-tasks` | `haiku` | `medium` | `false` | Descomposición mecánica del design | Transformación estructurada |
-| `sdd-apply` | `haiku` | `high` | `true` | Código real + múltiples skills simultáneas; haiku+high en vez de opus (costo/tiempo) | Fase más larga del flujo |
-| `sdd-verify` | `haiku` | `medium` | `true` | Gate de calidad, análisis exhaustivo | Corre tests + análisis |
-| `sdd-archive` | `haiku` | `medium` | `false` | Report estructurado, sin decisiones originales | Output corto y determinístico |
+| Sub-agente | Model | Effort | Color | Background | Razón del modelo |
+|------------|-------|--------|-------|------------|-------------------|
+| `sdd-init` | `haiku` | `medium` | 🔵 blue | `false` | Bootstrap estructurado, sin decisiones complejas |
+| `sdd-explore` | `haiku` | `medium` | 🔵 blue | `true` | Lectura y resumen de codebase — barato y suficiente |
+| `sdd-propose` | `sonnet` | `medium` | 🟣 purple | `true` | Trade-offs con impacto en cascada sobre todo el flujo |
+| `sdd-spec` | `haiku` | `medium` | 🟡 yellow | `false` | Output formal estructurado, sin creatividad arquitectural |
+| `sdd-design` | `opus` | `high` | 🟠 orange | `true` | **ES el blueprint que apply ejecuta. Acá NO se ahorra** |
+| `sdd-tasks` | `haiku` | `medium` | 🟡 yellow | `false` | Descomposición mecánica del design |
+| `sdd-apply` | `sonnet` | `high` | 🟢 green | `true` | Código real + varios rule sets simultáneos |
+| `sdd-verify` | `sonnet` | `high` | 🔴 red | `true` | **El gate NUNCA puede ser más débil que el implementador** |
+| `sdd-archive` | `haiku` | `medium` | 🩷 pink | `false` | Report estructurado, sin decisiones originales |
 
-> Todo el `model:`/`effort:` está fijado en el frontmatter de cada `sdd-*.md` — no hay parámetro
-> de invocación para `effort` (no existe a nivel plataforma), así que esto NO se decide dinámico
-> por sub-agente. `sdd-design` y `sdd-apply` van fijos en `haiku` + `effort: high` (las fases más
-> críticas); el resto va fijo en `medium`.
+> **Criterio del reparto**: el gasto se concentra donde el error es caro. Cinco de nueve fases
+> siguen en `haiku` porque son transformaciones estructuradas (init, explore, spec, tasks,
+> archive). Las cuatro que toman DECISIONES o producen CÓDIGO —propose, design, apply, verify—
+> suben. Un `haiku` con seis rule sets encima no los viola de forma ruidosa: los degrada en
+> silencio, que es peor. Y un gate de calidad más débil que el implementador no es un gate.
+>
+> Todo el `model:`/`effort:`/`color:` está fijado en el frontmatter de cada `sdd-*.md`.
+>
+> Cada `sdd-*` además precarga sus **skills de metodología** vía el campo `skills:` del frontmatter
+> (`sdd-verification-protocol`, `sdd-design-protocol`, `sdd-spec-protocol`,
+> `sdd-artifact-protocol`). Esas NO se inyectan por prompt: son agnósticas de stack y no cambian
+> con la tecnología del proyecto. Lo que vos SÍ seguís resolviendo e inyectando son las skills de
+> **stack** (`cc-*`, `csharp-*`, `angular-*`), porque dependen de qué tecnología toca el change.
 >
 > **Válvula de escape (la única forma real de "ajuste dinámico" que soporta la plataforma)**: si
-> una delegación puntual del grupo `medium` resulta inusualmente compleja para su fase (ej. un
-> `sdd-explore` sobre un monorepo gigante, un `sdd-propose` con trade-offs no triviales), el
-> orquestador puede pasar `model` explícito escalado (ej. `haiku` → `opus`) SOLO para esa llamada
-> — ver Protocolo de Delegación más abajo. `effort` no admite este mismo override por invocación,
-> solo `model`.
+> una delegación puntual del grupo `haiku` resulta inusualmente compleja para su fase (ej. un
+> `sdd-explore` sobre un monorepo gigante), el orquestador puede pasar `model` explícito escalado
+> SOLO para esa llamada — ver Protocolo de Delegación más abajo. `effort` no admite override por
+> invocación, solo `model`.
 
 **Regla de visibilidad**: `run_in_background: true` → el agente corre en background y se notifica
 al completar. `run_in_background: false` (u omitido) → corre inline, el resultado vuelve directo
