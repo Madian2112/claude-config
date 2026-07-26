@@ -12,7 +12,10 @@ conflicto: Engram es la capa persistente y cross-tool.
 
 ## Setup
 
-- Binario `engram` disponible en el `PATH` (v1.12.0+)
+- **Proyecto**: [Gentleman-Programming/engram](https://github.com/Gentleman-Programming/engram)
+- **Versión instalada**: `v1.12.0`
+  ([release](https://github.com/Gentleman-Programming/engram/releases/tag/v1.12.0))
+- Binario `engram` disponible en el `PATH`. Verificar con `engram --version`.
 - Registrado como MCP server de usuario (`claude mcp add --scope user`), persistido en
   **`.claude.json`, dentro de esta misma carpeta de configuración** (`CLAUDE_CONFIG_DIR`).
   Ese archivo **NO se versiona** (tiene tokens): la definición reproducible del server vive en

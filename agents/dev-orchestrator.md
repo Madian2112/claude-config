@@ -240,23 +240,19 @@ Antes de delegar:
      prompt: "## Project Standards (auto-resolved)\n...\n## Contexto del Proyecto\n...\n## Tarea para esta fase\n..."
    )
    ```
-6. **Agregar el bloque de Output Persistence** (skill `agent-output-persistence`, obligatorio) al
-   final de CADA prompt de sub-agente:
-   ```
-   ## Output Persistence (MANDATORY)
-   Al finalizar tu trabajo, ANTES de tu respuesta final, guardar tu output completo
-   en un archivo usando la herramienta `Write`:
-   - Path: ~/.claude/session-state/agent-outputs/{agent-id}__{yyyyMMdd-HHmmss}.md
-   - Formato: header con agent type, timestamp, task summary, status + sección `## Output` con contenido completo
-   - Si no podés crear el archivo, incluir todo el output en tu respuesta igualmente
-   ```
+6. **NO agregues bloque de Output Persistence al prompt.** Todos los `sdd-*` precargan
+   `sdd-artifact-protocol` por frontmatter, y su §3 ya define el path, el formato y el fallback.
+   Repetirlo en el prompt duplica la instrucción y abre la puerta a que las dos versiones drifteen.
 
-### Recovery de Output de Sub-Agente (skill `agent-output-persistence`)
+### Recovery de Output de Sub-Agente (ver `sdd-artifact-protocol` §4)
 
 Si no podés leer el output de un sub-agente delegado (falla, o después de compactación):
 
-1. Buscar en disco: `Read ~/.claude/session-state/agent-outputs/{agent-id}__*.md` (o `Glob` si no sabés el timestamp exacto) → si existe, leer y usar
-2. Si no existe: re-ejecutar la tarea inline (`Grep` + `Read` directo) — **NUNCA** re-delegar a otro sub-agente solo para "buscar el output perdido"
+1. Buscar en disco: `Read ~/.claude/session-state/agent-outputs/{agent-type}__*.md` (o `Glob` si no sabés el timestamp exacto) → si existe, leer y usar
+2. Si no está el `.md`, revisar `~/.claude/session-state/agent-outputs/_index.jsonl` — el hook
+   `SubagentStop` deja ahí una traza de CADA corrida (tipo de agente, timestamp, transcript),
+   corra bien o mal el sub-agente
+3. Si tampoco: re-ejecutar la tarea inline (`Grep` + `Read` directo) — **NUNCA** re-delegar a otro sub-agente solo para "buscar el output perdido"
 
 ### Integración con Compactación
 

@@ -30,9 +30,10 @@ por defecto Claude Code deja en el home, pero acá vive **adentro** de esta carp
 ruta (`path.resolve(__dirname, '..')`), con `CLAUDE_CONFIG_DIR` como override. No dependen de
 `os.homedir()`, así que funcionan aunque muevas la carpeta.
 
-> ⚠️ Lo único que sí tiene la ruta escrita es el comando de cada hook en `settings.json`
-> (`node "$HOME/.claude/hooks/..."`). Si tu carpeta de configuración **no** está en
-> `$HOME/.claude`, actualizá esas 6 líneas para que apunten a donde la tengas.
+Lo único con la ruta escrita a mano son los comandos de hook en `settings.json`
+(`node "$HOME/.claude/hooks/..."`). **Asunción de este setup: la carpeta siempre vive en el home
+del usuario actual** (`$HOME/.claude`), así que esas rutas son estables en cualquier máquina.
+Si algún día la movés a otro lado, hay que actualizar esas 7 líneas.
 
 ## Requisitos
 
@@ -40,7 +41,7 @@ ruta (`path.resolve(__dirname, '..')`), con `CLAUDE_CONFIG_DIR` como override. N
 |-----------|---------|
 | **Git for Windows** (Git Bash) | Claude Code solo usa una shell POSIX si lo detecta. Sin él cae a PowerShell y los comandos POSIX de agentes y skills rompen **en silencio**. |
 | **Node.js** | Los hooks están escritos en Node. Ya viene con el toolchain de Angular. |
-| **`engram` en el `PATH`** | Memoria persistente vía MCP. Sin él, el protocolo de `CLAUDE.md` no se puede cumplir — el hook `SessionStart` avisa. |
+| **`engram` v1.12.0+ en el `PATH`** | Memoria persistente vía MCP. [Gentleman-Programming/engram](https://github.com/Gentleman-Programming/engram) — verificar con `engram --version`. Sin él, el protocolo de `CLAUDE.md` no se puede cumplir; el hook `SessionStart` avisa fuerte. |
 | **.NET SDK / Angular CLI** | Opcionales: los usa el hook `auto-format` si están. Si no están, no formatea y sigue. |
 
 ## Bootstrap en una máquina nueva
@@ -98,6 +99,24 @@ settings.json             Modelo, permisos, hooks, statusline
 | `session-bootstrap.js` | SessionStart | Cleanup de `agent-outputs` (TTL 24h), inyecta changes SDD abiertos, avisa si Engram no está |
 | `subagent-index.js` | SubagentStop | Traza de cada corrida de sub-agente en `_index.jsonl` |
 | `statusline.js` | statusLine | `proyecto · rama* · [modelo] · SDD:change→fase` |
+| `validate-config.js` | manual | Valida la consistencia de toda la config — ver abajo |
+
+## Validar la configuración
+
+```bash
+node hooks/validate-config.js     # exit 0 si esta todo bien, 1 si hay errores
+```
+
+Corrélo **antes de commitear cambios en esta config**. Detecta lo que se rompe al borrar o
+renombrar cosas, que es de donde salieron todos los problemas históricos de este repo:
+
+1. Frontmatter YAML ausente o roto en `agents/` y `skills/`
+2. Un agente que precarga (`skills:`) una skill que ya no existe → **el agente no arranca**
+3. Referencias colgadas en `SKILL-REGISTRY.md` a skills borradas
+4. Skills de stack sin compact rules en el registry → el orquestador nunca las inyecta
+5. Hooks de `settings.json` apuntando a archivos inexistentes
+6. `model`, `effort` o `color` inválidos en el frontmatter de un agente
+7. Errores de sintaxis en los hooks
 
 **Criterio**: un hook falla siempre **abierto** (nunca frena el trabajo por un error propio),
 salvo los dos guards, cuyo trabajo ES bloquear.
@@ -122,7 +141,6 @@ producen código), `haiku` en init/explore/spec/tasks/archive (transformaciones 
 | `/arch-review` | Auditoría de Clean Architecture del diff actual |
 | `/workshop-material` | Material de taller a partir de las skills |
 | `/tdd` | Ciclo estricto red-green-refactor |
-| `/graphify` | Knowledge graph del codebase |
 
 ## Cosas que NO son negociables
 

@@ -63,7 +63,6 @@ No se auto-cargan (`disable-model-invocation: true`) — las disparás vos.
 | `/arch-review` | Auditoría de Clean Architecture sobre el diff actual, con severidades y regla violada |
 | `/workshop-material` | Material de taller a partir de las skills del ecosistema |
 | `/tdd` | Ciclo estricto red-green-refactor con gates (verifica primero que haya harness de tests) |
-| `/graphify` | Knowledge graph navegable del codebase |
 
 ## User Skills — Foundation (Workflow / Meta)
 
@@ -71,9 +70,6 @@ No se auto-cargan (`disable-model-invocation: true`) — las disparás vos.
 |---------|-------|------|
 | Crear PR, abrir pull request, preparar branch para review, naming de branches, conventional commits | branch-pr | `~/.claude/skills/branch-pr/SKILL.md` |
 | "judgment day", "review adversarial", "doble review", "que lo juzguen" — review paralelo con dos jueces independientes | judgment-day | `~/.claude/skills/judgment-day/SKILL.md` |
-| Crear nueva skill de agente, documentar patrones para AI, agregar instrucciones de agente | skill-creator | `~/.claude/skills/skill-creator/SKILL.md` |
-| ALWAYS at session start, delegación a sub-agentes, recovery de outputs, compactación de sesión | agent-output-persistence | `~/.claude/skills/agent-output-persistence/SKILL.md` |
-| Pregunta sobre el codebase/arquitectura/relación entre archivos, entender un proyecto nuevo, mapear dependencias, `/graphify` | graphify | `~/.claude/skills/graphify/SKILL.md` |
 
 ---
 
@@ -81,12 +77,6 @@ No se auto-cargan (`disable-model-invocation: true`) — las disparás vos.
 
 Reglas pre-digeridas. El orquestador copia los bloques relevantes en el prompt de cada
 sub-agente como `## Project Standards (auto-resolved)`.
-
-### agent-output-persistence
-- Al finalizar trabajo, guardar output completo en `~/.claude/session-state/agent-outputs/{agent-id}__{yyyyMMdd-HHmmss}.md`
-- Formato: header con metadata (agent type, timestamp, task summary, status) + sección `## Output` con contenido completo
-- Usar herramienta `Write` para escribir el archivo — si falla, incluir todo en la respuesta igualmente
-- El archivo es un backup — el output normal de la respuesta sigue siendo el canal principal
 
 ### cc-architecture
 - Nunca lógica de negocio en controllers — solo coordinación: HTTP → Application → Response
@@ -280,20 +270,6 @@ sub-agente como `## Project Standards (auto-resolved)`.
 - Mensajes de error: SIEMPRE usar constantes de `ApplicationMessage` / `Mensajes.cs` — nunca strings literales hardcodeados
 - Señales para crear uno: validación cruzada entre 2+ conceptos, orquestar resultados de múltiples queries ya ejecutadas, transformar/enriquecer datos sin I/O
 
-### skill-creator
-- Una skill = un patrón repetible que el AI necesita reglas explícitas para aplicar
-- NO crear skill si ya hay documentación que sirva como referencia
-- Estructura: `skills/{name}/SKILL.md` (+ opcional `assets/`, `references/`)
-- Frontmatter obligatorio: `name`, `description` con `Trigger:` claro, `license`, `metadata.version`
-- Compact rules de la skill van DESPUÉS en el SKILL-REGISTRY (no en SKILL.md)
-- Si la skill referencia archivos del proyecto, usar paths relativos al proyecto, no absolutos
-
-### graphify
-- Invocar con `/graphify <path>` para construir un knowledge graph navegable del codebase/corpus (HTML + JSON + reporte)
-- Usar cuando el usuario pregunta sobre arquitectura, relaciones entre archivos, o está entrando a un codebase nuevo — especialmente si ya existe `graphify-out/`
-- `/graphify query "<pregunta>"` para recorrer el grafo ya construido en vez de releer todo el código
-- Cada edge está etiquetado EXTRACTED/INFERRED/AMBIGUOUS — nunca inventar relaciones no soportadas por el grafo
-
 ---
 
 ## Tabla de Resolución por Fase SDD
@@ -332,8 +308,6 @@ El orquestador usa esta tabla para decidir qué compact rules inyectar en cada s
 | Async code review | `csharp-concurrency-patterns` |
 | Crear PR / preparar branch | `branch-pr` |
 | Review adversarial / "judgment day" | `judgment-day` (+ las skills del stack del target) |
-| Crear nueva skill | `skill-creator` |
-| Pregunta de arquitectura / codebase nuevo / relaciones entre archivos | `graphify` |
 
 > Skills de proyecto (ej. un `angular-new-feature` propio de un repo Angular puntual) se agregan
 > acá como filas nuevas cuando corresponda — viven en `.claude/skills/` a nivel de ESE proyecto,
