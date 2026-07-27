@@ -28,6 +28,15 @@ process.stdin.on('end', () => {
   const cwd = (p.workspace && p.workspace.current_dir) || p.cwd || process.cwd();
   const parts = [`[36m${path.basename(cwd)}[0m`];
 
+  // Nombre de la sesion. OJO: el campo puede NO venir — solo aparece si la nombraste con
+  // --name / /rename, o una vez que existe un titulo autogenerado. El nombre por defecto
+  // (tipo "my-app-3f") NO lo popula. Por eso siempre hay que tolerar la ausencia.
+  const sesion = (p.session_name || '').trim();
+  if (sesion) {
+    const corta = sesion.length > 26 ? sesion.slice(0, 25) + '…' : sesion;
+    parts.push(`[90m‹${corta}›[0m`);
+  }
+
   // Rama + dirty flag
   const git = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
     cwd,
