@@ -1,0 +1,27 @@
+{
+  "$comment": [
+    "Definicion reproducible del MCP server de Engram.",
+    "",
+    "PROBLEMA QUE RESUELVE: el registro real vive en .claude.json, dentro de esta misma carpeta",
+    "de configuracion, y ese archivo esta (correctamente) en .gitignore porque contiene tokens.",
+    "Resultado: la pieza de la que",
+    "depende el protocolo OBLIGATORIO de memoria de CLAUDE.md no estaba versionada en ningun",
+    "lado. Maquina nueva o reinstalacion = protocolo apuntando a un server inexistente, sin",
+    "error visible.",
+    "",
+    "COMO USARLO:",
+    "  1) Registro a nivel usuario (una vez por maquina):",
+    "       claude mcp add --scope user engram -- engram mcp",
+    "  2) O copiar este bloque mcpServers a un .mcp.json en la raiz de un proyecto.",
+    "     settings.json tiene enableAllProjectMcpServers: true, asi que no hay que aprobarlo a mano.",
+    "",
+    "VERIFICACION: el hook SessionStart (hooks/session-bootstrap.js) chequea que el binario",
+    "'engram' este en el PATH y avisa FUERTE si no esta. Falla ruidoso, nunca silencioso."
+  ],
+  "mcpServers": {
+    "engram": {
+      "command": "engram",
+      "args": ["mcp"]
+    }
+  }
+}
