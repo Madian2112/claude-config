@@ -48,22 +48,41 @@ process.stdin.on('end', () => {
   const model = (p.model && (p.model.display_name || p.model.id)) || '';
   if (model) parts.push(`[35m[${model}][0m`);
 
-  // Fase SDD del change abierto mas reciente
-  try {
-    const changesDir = path.join(cwd, '.atl', 'changes');
-    let best = null;
-    for (const name of fs.readdirSync(changesDir)) {
-      const st = path.join(changesDir, name, 'state.md');
-      if (!fs.existsSync(st)) continue;
-      const m = fs.readFileSync(st, 'utf8').match(/##\s*Current Phase\s*\r?\n+\s*([^\r\n]+)/i);
-      const fase = (m ? m[1] : '').trim();
-      if (!fase || /^closed$/i.test(fase)) continue;
-      const mtime = fs.statSync(st).mtimeMs;
-      if (!best || mtime > best.mtime) best = { name, fase, mtime };
+  // Agente principal de la sesion. El campo `agent` SOLO llega cuando se corre con --agent
+  // o con el setting `agent` configurado; en una sesion normal no existe.
+  const agente = (p.agent && p.agent.name) || '';
+
+  // La fase SDD se muestra UNICAMENTE bajo dev-orchestrator: es el unico contexto donde el
+  // flujo por fases esta corriendo. En una sesion suelta ese dato es ruido.
+  if (agente === 'dev-orchestrator') {
+    try {
+      const changesDir = path.join(cwd, '.atl', 'changes');
+      let best = null;
+      for (const name of fs.readdirSync(changesDir)) {
+        const st = path.join(changesDir, name, 'state.md');
+        if (!fs.existsSync(st)) continue;
+        const m = fs.readFileSync(st, 'utf8').match(/##\s*Current Phase\s*\r?\n+\s*([^\r\n]+)/i);
+        // state.md a veces trae prosa despues del token ("verify (completado — ...)").
+        // Nos quedamos con el token: cortamos en el primer parentesis, guion o punto y coma.
+        const fase = (m ? m[1] : '')
+          .trim()
+          .split(/[(\-–—;,]/)[0]
+          .trim()
+          .slice(0, 24);
+        if (!fase || /^closed$/i.test(fase)) continue;
+        const mtime = fs.statSync(st).mtimeMs;
+        if (!best || mtime > best.mtime) best = { name, fase, mtime };
+      }
+      if (best) {
+        const change = best.name.length > 28 ? best.name.slice(0, 27) + '…' : best.name;
+        parts.push(`[32mSDD:${change}→${best.fase}[0m`);
+      }
+    } catch {
+      /* proyecto sin SDD */
     }
-    if (best) parts.push(`[32mSDD:${best.name}→${best.fase}[0m`);
-  } catch {
-    /* proyecto sin SDD */
+  } else if (agente) {
+    // Otro agente principal: mostrar cual, para saber bajo que persona estas trabajando.
+    parts.push(`[34m@${agente}[0m`);
   }
 
   process.stdout.write(parts.join('  '));

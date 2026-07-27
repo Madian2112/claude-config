@@ -98,7 +98,7 @@ settings.json             Modelo, permisos, hooks, statusline
 | `auto-format.js` | PostToolUse (Edit·Write) | `dotnet format` / `prettier` sobre el archivo tocado. No compila |
 | `session-bootstrap.js` | SessionStart | Cleanup de `agent-outputs` (TTL 24h), inyecta changes SDD abiertos, avisa si Engram no está |
 | `subagent-index.js` | SubagentStop | Traza de cada corrida de sub-agente en `_index.jsonl` |
-| `statusline.js` | statusLine | `proyecto · rama* · [modelo] · SDD:change→fase` |
+| `statusline.js` | statusLine | `proyecto · rama* · [modelo] · SDD:change→fase` — el segmento SDD **solo** aparece bajo `dev-orchestrator` (ver abajo) |
 | `validate-config.js` | manual | Valida la consistencia de toda la config — ver abajo |
 
 ## Validar la configuración
@@ -120,6 +120,22 @@ renombrar cosas, que es de donde salieron todos los problemas históricos de est
 
 **Criterio**: un hook falla siempre **abierto** (nunca frena el trabajo por un error propio),
 salvo los dos guards, cuyo trabajo ES bloquear.
+
+### La statusline según el agente activo
+
+El payload de `statusLine` trae `agent.name`, pero **solo** cuando la sesión corre con `--agent`
+o con el setting `agent`. La barra usa ese dato para mostrar lo que corresponde a cada contexto:
+
+| Sesión | Qué muestra |
+|--------|-------------|
+| `claude --agent=dev-orchestrator` | `proyecto · rama* · [modelo] · SDD:change→fase` |
+| `claude` sin agente | `proyecto · rama* · [modelo]` — sin ruido de SDD |
+| `claude --agent=otro` | `proyecto · rama* · [modelo] · @nombre-del-agente` |
+
+La fase se **trunca en el primer paréntesis, guion o punto y coma** y se corta a 24 caracteres:
+`state.md` a veces trae prosa después del token (`verify (completado — falta ejecución BD)`) y eso
+se comía toda la barra. El detalle completo se lee donde corresponde: en `state.md` o con
+`/sdd-status`.
 
 ## Flujo SDD
 
