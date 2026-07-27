@@ -98,7 +98,7 @@ settings.json             Modelo, permisos, hooks, statusline
 | `auto-format.js` | PostToolUse (Edit·Write) | `dotnet format` / `prettier` sobre el archivo tocado. No compila |
 | `session-bootstrap.js` | SessionStart | Cleanup de `agent-outputs` (TTL 24h), inyecta changes SDD abiertos, avisa si Engram no está |
 | `subagent-index.js` | SubagentStop | Traza de cada corrida de sub-agente en `_index.jsonl` |
-| `statusline.js` | statusLine | `proyecto · rama* · [modelo] · SDD:change→fase` — el segmento SDD **solo** aparece bajo `dev-orchestrator` (ver abajo) |
+| `statusline.js` | statusLine | `proyecto · ‹sesión› · rama* · [modelo] · SDD:change→fase` — el segmento SDD **solo** aparece bajo `dev-orchestrator` (ver abajo) |
 | `validate-config.js` | manual | Valida la consistencia de toda la config — ver abajo |
 
 ## Validar la configuración
@@ -128,9 +128,14 @@ o con el setting `agent`. La barra usa ese dato para mostrar lo que corresponde 
 
 | Sesión | Qué muestra |
 |--------|-------------|
-| `claude --agent=dev-orchestrator` | `proyecto · rama* · [modelo] · SDD:change→fase` |
-| `claude` sin agente | `proyecto · rama* · [modelo]` — sin ruido de SDD |
-| `claude --agent=otro` | `proyecto · rama* · [modelo] · @nombre-del-agente` |
+| `claude --agent=dev-orchestrator` | `proyecto · ‹sesión› · rama* · [modelo] · SDD:change→fase` |
+| `claude` sin agente | `proyecto · ‹sesión› · rama* · [modelo]` — sin ruido de SDD |
+| `claude --agent=otro` | `proyecto · ‹sesión› · rama* · [modelo] · @nombre-del-agente` |
+
+El segmento `‹sesión›` sale de `session_name`, que **no siempre viene**: aparece solo si nombraste
+la sesión con `--name` o `/rename`, o una vez que existe un título autogenerado. El nombre por
+defecto (tipo `my-app-3f`) NO lo popula, así que el segmento simplemente se omite. Se trunca a
+26 caracteres.
 
 La fase se **trunca en el primer paréntesis, guion o punto y coma** y se corta a 24 caracteres:
 `state.md` a veces trae prosa después del token (`verify (completado — falta ejecución BD)`) y eso
