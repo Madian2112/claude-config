@@ -3,9 +3,7 @@ name: tdd
 description: Arranca un ciclo estricto red-green-refactor sobre la funcionalidad indicada, con gates explícitos entre fases.
 argument-hint: "[descripción de la funcionalidad]"
 disable-model-invocation: true
-skills:
-  - cc-solid
-  - cc-complexity
+allowed-tools: Read, Edit, Write, Grep, Glob, Bash, Skill
 ---
 
 # Strict TDD — **$ARGUMENTS**
@@ -38,7 +36,13 @@ El código **MÍNIMO** que lo pasa. Sin generalizar, sin "ya que estoy", sin man
 ningún test pide todavía. Corré los tests y mostrá el verde.
 
 ### 3. 🔧 REFACTOR
-Recién ahora aplicás `cc-solid` y `cc-complexity`, con la red de seguridad puesta.
+Recién ahora, con la red de seguridad puesta, **cargá `cc-solid` y `cc-complexity` con el tool
+`Skill`** y aplicalas.
+
+> Cargalas acá, no antes: en RED y GREEN solo estorban (te empujan a generalizar código que
+> ningún test pide todavía). Y cargalas **explícitamente** — el frontmatter de una skill no puede
+> precargar otras skills, así que si no las pedís, refactorizás de memoria.
+
 Volvé a correr los tests. Si algo se puso rojo, el refactor está mal: revertí, no parchees el test.
 
 ## Reglas duras

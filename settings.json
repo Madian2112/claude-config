@@ -92,7 +92,7 @@
 
   "statusLine": {
     "type": "command",
-    "command": "node \"$HOME/.claude/hooks/statusline.js\""
+    "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/statusline.js\""
   },
 
   "hooks": {
@@ -101,20 +101,31 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/session-bootstrap.js\"",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/session-bootstrap.js\"",
             "timeout": 15,
             "statusMessage": "Bootstrap de sesion (cleanup + estado SDD)..."
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/post-compact-memory.js\"",
+            "timeout": 10,
+            "statusMessage": "Recordatorio de persistencia post-compactacion..."
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write",
+        "matcher": "Edit|MultiEdit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/clean-arch-guard.js\"",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/clean-arch-guard.js\"",
             "timeout": 10,
             "statusMessage": "Validando dependencias de capas..."
           }
@@ -125,22 +136,40 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/git-guard.js\"",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/git-guard.js\"",
             "timeout": 10,
             "statusMessage": "Validando comando git..."
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/precommit-validate.js\"",
+            "timeout": 30,
+            "statusMessage": "Validando la config antes de commitear..."
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write",
+        "matcher": "Edit|MultiEdit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/auto-format.js\"",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/auto-format.js\"",
             "timeout": 60,
             "statusMessage": "Formateando archivo..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/session-close-guard.js\"",
+            "timeout": 15,
+            "statusMessage": "Verificando el cierre de sesion de Engram..."
           }
         ]
       }
@@ -150,7 +179,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/subagent-index.js\"",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/subagent-index.js\"",
             "timeout": 10
           }
         ]

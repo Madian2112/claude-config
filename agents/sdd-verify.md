@@ -12,6 +12,18 @@ color: red
 skills:
   - sdd-verification-protocol
   - sdd-artifact-protocol
+# "Solo lectura" acá significa "no toca codigo de proyecto", NO "no escribe nada": este agente
+# tiene que producir verify-report.md y tech-debt.md. Esa restriccion es sobre el PATH, no sobre
+# el tool, asi que `disallowedTools` no puede expresarla — sacarle Write lo romperia. El guard
+# permite escribir bajo .atl/ y rechaza todo lo demas. Enforcement, no promesa.
+hooks:
+  PreToolUse:
+    - matcher: "Edit|MultiEdit|Write"
+      hooks:
+        - type: command
+          command: "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/atl-only-guard.js\""
+          timeout: 10
+          statusMessage: "Validando que la escritura sea dentro de .atl/..."
 ---
 
 # SDD Verify — Validación de Implementación

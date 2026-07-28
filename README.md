@@ -30,10 +30,13 @@ por defecto Claude Code deja en el home, pero acá vive **adentro** de esta carp
 ruta (`path.resolve(__dirname, '..')`), con `CLAUDE_CONFIG_DIR` como override. No dependen de
 `os.homedir()`, así que funcionan aunque muevas la carpeta.
 
-Lo único con la ruta escrita a mano son los comandos de hook en `settings.json`
-(`node "$HOME/.claude/hooks/..."`). **Asunción de este setup: la carpeta siempre vive en el home
-del usuario actual** (`$HOME/.claude`), así que esas rutas son estables en cualquier máquina.
-Si algún día la movés a otro lado, hay que actualizar esas 7 líneas.
+**Los comandos de hook en `settings.json` también.** Usan `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`:
+si moviste la carpeta y apuntaste `CLAUDE_CONFIG_DIR` ahí, los hooks siguen encontrándose solos;
+si no la moviste, cae al default de siempre. No hay ninguna ruta que actualizar a mano.
+
+> Antes esas líneas decían `$HOME/.claude` fijo, lo cual contradecía en silencio al párrafo de
+> arriba: los scripts se ubicaban solos pero `settings.json` no los encontraba. Moverla te dejaba
+> con los hooks muertos y ningún mensaje de error.
 
 ## Requisitos
 
@@ -93,10 +96,14 @@ settings.json             Modelo, permisos, hooks, statusline
 
 | Hook | Evento | Qué hace |
 |------|--------|----------|
-| `clean-arch-guard.js` | PreToolUse (Edit·Write) | **Bloquea** violaciones de capas: EF/HTTP en Domain, HttpContext/DbContext en Application, mensajes de negocio en Repository, DTOs como `record`, sufijos prohibidos |
+| `clean-arch-guard.js` | PreToolUse (Edit·MultiEdit·Write) | **Bloquea** violaciones de capas: EF/HTTP en Domain, HttpContext/DbContext en Application, mensajes de negocio en Repository, DTOs como `record`, sufijos prohibidos |
 | `git-guard.js` | PreToolUse (Bash) | **Bloquea** `git commit/push/merge/rebase` en repos de proyecto. Exento el repo de config |
-| `auto-format.js` | PostToolUse (Edit·Write) | `dotnet format` / `prettier` sobre el archivo tocado. No compila |
-| `session-bootstrap.js` | SessionStart | Cleanup de `agent-outputs` (TTL 24h), inyecta changes SDD abiertos, avisa si Engram no está |
+| `precommit-validate.js` | PreToolUse (Bash) | **Bloquea** `git commit` en ESTE repo si `validate-config.js` falla. La config no se commitea rota |
+| `atl-only-guard.js` | PreToolUse — scoped a `sdd-verify` | **Bloquea** escrituras fuera de `.atl/`. Enganchado por el campo `hooks:` del frontmatter del agente, no global |
+| `auto-format.js` | PostToolUse (Edit·MultiEdit·Write) | `dotnet format` / `prettier` sobre el archivo tocado. No compila |
+| `session-bootstrap.js` | SessionStart | Cleanup de `agent-outputs` (TTL 24h) y de marcas de cierre (TTL 7d), inyecta changes SDD abiertos, avisa si Engram no está |
+| `post-compact-memory.js` | SessionStart (`compact`) | Inyecta el protocolo AFTER COMPACTION de Engram apenas se compacta el contexto |
+| `session-close-guard.js` | Stop | Bloquea **una vez por sesión** si hubo escrituras y no se llamó a `mem_session_summary` |
 | `subagent-index.js` | SubagentStop | Traza de cada corrida de sub-agente en `_index.jsonl` |
 | `statusline.js` | statusLine | `proyecto · ‹sesión› · rama* · [modelo] · SDD:change→fase` — el segmento SDD **solo** aparece bajo `dev-orchestrator` (ver abajo) |
 | `validate-config.js` | manual | Valida la consistencia de toda la config — ver abajo |
@@ -107,16 +114,37 @@ settings.json             Modelo, permisos, hooks, statusline
 node hooks/validate-config.js     # exit 0 si esta todo bien, 1 si hay errores
 ```
 
-Corrélo **antes de commitear cambios en esta config**. Detecta lo que se rompe al borrar o
-renombrar cosas, que es de donde salieron todos los problemas históricos de este repo:
+Ya no hace falta que te acuerdes: el hook `precommit-validate.js` lo corre solo y **bloquea el
+`git commit`** si algo está roto. Corrélo a mano igual cuando quieras feedback rápido.
+
+Detecta lo que se rompe al borrar o renombrar cosas, que es de donde salieron todos los problemas
+históricos de este repo:
 
 1. Frontmatter YAML ausente o roto en `agents/` y `skills/`
-2. Un agente que precarga (`skills:`) una skill que ya no existe → **el agente no arranca**
-3. Referencias colgadas en `SKILL-REGISTRY.md` a skills borradas
-4. Skills de stack sin compact rules en el registry → el orquestador nunca las inyecta
-5. Hooks de `settings.json` apuntando a archivos inexistentes
-6. `model`, `effort` o `color` inválidos en el frontmatter de un agente
-7. Errores de sintaxis en los hooks
+2. **Campos de frontmatter que no existen en el schema** → se ignoran en silencio (ver abajo)
+3. Un agente que precarga (`skills:`) una skill que ya no existe → **el agente no arranca**
+4. Referencias colgadas en `SKILL-REGISTRY.md` a skills borradas
+5. Skills de stack sin compact rules en el registry → el orquestador nunca las inyecta
+6. Hooks de `settings.json` apuntando a archivos inexistentes
+7. `model`, `effort` o `color` inválidos en el frontmatter de un agente
+8. Errores de sintaxis en los hooks
+
+### El chequeo de schema (punto 2) y por qué existe
+
+`skills/arch-review` y `skills/tdd` declaraban `skills:` en su frontmatter, convencidas de que
+precargaban `cc-solid` y compañía. **Ese campo no existe en `SKILL.md`** — es campo de sub-agente.
+Claude Code lo ignoraba sin decir nada, y las dos corrían **sin una sola regla cargada**.
+
+Un campo mal escrito no explota: no hace nada. Por eso el validador compara contra un **schema
+cerrado** y no contra una lista de prohibidos. Ojo con el casing, que son dos schemas distintos:
+
+| | Campo de herramientas denegadas | Otros ejemplos |
+|---|---|---|
+| `skills/*/SKILL.md` | `disallowed-tools` (kebab) | `allowed-tools`, `argument-hint`, `paths` |
+| `agents/*.md` | `disallowedTools` (camel) | `tools`, `permissionMode`, `maxTurns`, `skills` |
+
+Una skill **no puede precargar otras skills**. Si necesitás reglas cargadas, pedilas en el body
+con el tool `Skill` o usá `context: fork` + `agent:`.
 
 **Criterio**: un hook falla siempre **abierto** (nunca frena el trabajo por un error propio),
 salvo los dos guards, cuyo trabajo ES bloquear.
@@ -170,6 +198,9 @@ producen código), `haiku` en init/explore/spec/tasks/archive (transformaciones 
 - **Nunca** buildear para "verificar". `dotnet test` en la fase verify sí.
 - Los sub-agentes **no pueden preguntarle nada al usuario**: registran supuestos en
   `## Assumptions & Open Questions` y el orquestador escala.
+- `sdd-verify` **no escribe fuera de `.atl/`** (hook `atl-only-guard.js`). Verificar es reportar,
+  no corregir: quien arregla lo que encontró es juez y parte, y borra la evidencia.
+- La config **no se commitea rota** (hook `precommit-validate.js`).
 
 ## Créditos
 

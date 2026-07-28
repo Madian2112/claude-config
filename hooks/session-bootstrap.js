@@ -45,6 +45,19 @@ try {
   /* nunca frenamos la sesion por el cleanup */
 }
 
+// Las marcas de session-close-guard son una por sesion y no sirven despues. Sin este barrido
+// el directorio crece para siempre.
+try {
+  const marcasDir = path.join(configDir, 'session-state', 'close-reminders');
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  for (const f of fs.existsSync(marcasDir) ? fs.readdirSync(marcasDir) : []) {
+    const full = path.join(marcasDir, f);
+    if (fs.statSync(full).mtimeMs < cutoff) fs.unlinkSync(full);
+  }
+} catch {
+  /* ignorar */
+}
+
 // ------------------------------------------------------- 2. Estado SDD (.atl)
 try {
   const changesDir = path.join(process.cwd(), '.atl', 'changes');

@@ -3,28 +3,28 @@ name: arch-review
 description: Auditoría de Clean Architecture sobre el diff actual — violaciones de capas, SOLID, complejidad, naming y seguridad.
 argument-hint: "[opcional: ruta o area a revisar]"
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Bash
-skills:
-  - cc-architecture
-  - cc-solid
-  - cc-complexity
-  - cc-naming
-  - cc-domain-services
+allowed-tools: Read, Grep, Glob, Bash, Skill
 ---
 
 # Arch Review — Auditoría del diff actual
 
-Auditá los cambios actuales contra los estándares precargados. Alcance: **$ARGUMENTS**
+Auditá los cambios actuales contra los estándares del equipo. Alcance: **$ARGUMENTS**
 (si viene vacío, el diff completo del working tree).
 
 ## Procedimiento
 
-1. `git diff --stat` y `git diff` para ver qué cambió realmente. Si no hay cambios sin commitear,
+1. **Cargá las reglas base ANTES de mirar el diff.** Con el tool `Skill`, una por una:
+   `cc-architecture`, `cc-solid`, `cc-complexity`, `cc-naming`, `cc-domain-services`.
+
+   > Esto NO es opcional y NO es automático. El frontmatter de una skill **no puede** precargar
+   > otras skills (no existe un campo `skills:` en `SKILL.md` — es campo de sub-agente). Si no las
+   > cargás explícitamente acá, estás auditando de memoria y los hallazgos no tienen regla atrás.
+
+2. `git diff --stat` y `git diff` para ver qué cambió realmente. Si no hay cambios sin commitear,
    usá `git diff HEAD~1` y avisá que estás revisando el último commit.
-2. Leé los archivos tocados completos cuando el diff no alcance para juzgar el contexto.
-3. Auditá contra las skills precargadas. Si el diff toca `.ts`/`.html`, cargá también
-   `angular-core` y `typescript-advanced` con el tool `Skill`; si toca endpoints o SQL,
-   `dotnet-api-security` y `efcore-data-access`.
+3. Leé los archivos tocados completos cuando el diff no alcance para juzgar el contexto.
+4. Ampliá según el stack tocado: si el diff toca `.ts`/`.html`, cargá también `angular-core` y
+   `typescript-advanced`; si toca endpoints o SQL, `dotnet-api-security` y `efcore-data-access`.
 
 ## Formato del reporte
 
