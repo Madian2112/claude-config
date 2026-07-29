@@ -162,6 +162,35 @@ o con el setting `agent`. La barra usa ese dato para mostrar lo que corresponde 
 | `claude` sin agente | `proyecto · ‹sesión› · rama* · [modelo]` — sin ruido de SDD |
 | `claude --agent=otro` | `proyecto · ‹sesión› · rama* · [modelo] · @nombre-del-agente` |
 
+### Segunda fila: cuánto te queda
+
+La statusline imprime **dos filas** (cada línea impresa es una fila):
+
+```
+~/erp-facturacion  feat/12345-alta-vales*  [sonnet]  SDD:alta-vales→design
+ctx ████████░░ 78% libre  ·  5h 24% ↻3h10m  ·  7d 41% ↻2d21h
+```
+
+Son **dos recursos distintos** que se confunden todo el tiempo:
+
+| | Qué mide | ¿Se recupera? |
+|---|---|---|
+| `ctx` | Cuánto entra en **esta conversación** antes de compactar | ✅ Sí, al compactar |
+| `5h` / `7d` | Tu **cuota de suscripción** (ventanas de 5 horas y 7 días) | ❌ No, hasta el `↻reset` |
+
+Los colores van por lo que **queda libre**: verde >30%, amarillo ≤30%, rojo ≤10%.
+
+Ambos datos ya vienen en el payload del `statusLine` (`context_window` y `rate_limits`): no hay
+que calcular nada ni consultar nada. Pero **los dos pueden faltar**, y la doc lo dice explícito:
+
+- `rate_limits` existe **solo para suscriptores Claude.ai (Pro/Max)**, y recién después de la
+  primera respuesta de la API. Cada ventana puede faltar por separado.
+- `used_percentage` / `remaining_percentage` pueden venir en `null` al arrancar la sesión.
+
+Si no hay ningún dato, **la fila entera no se dibuja**. Una barra a medias confunde más que ayuda.
+El tamaño de ventana se muestra solo cuando **no** es el default de 200k (`94% libre 1M`), porque
+ahí el porcentaje significa otra cosa.
+
 ### Sub-agentes en vuelo
 
 Cuando hay sub-agentes corriendo, la barra cierra con `⚙ sdd-design[opus] sdd-spec[haiku] +1`

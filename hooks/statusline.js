@@ -6,7 +6,13 @@
  * proyecto / rama / modelo / fase SDD evita la mitad de las preguntas de "¿en que
  * estabamos?".
  *
+ * Dos filas (cada linea impresa es una fila):
  *   ~/erp-facturacion  feat/12345-alta-vales*  [sonnet]  SDD:alta-vales→design
+ *   ctx ████████░░ 78% libre  ·  5h 24%  ·  7d 41% (reset 3h10m)
+ *
+ * La segunda fila responde "¿cuanto me queda?" sin tener que preguntar: contexto libre de la
+ * sesion y consumo de los limites de uso. Los dos datos vienen en el payload del statusLine
+ * (`context_window` y `rate_limits`), no hay que calcularlos ni pedirlos a ningun lado.
  */
 
 'use strict';
@@ -15,6 +21,88 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { RUNS_DIR, etiqueta, discrepa } = require('./lib/agent-meta');
+
+
+// ---------------------------------------------------------------- Fila 2: presupuesto
+//
+// Dos recursos distintos que la gente confunde todo el tiempo:
+//   contexto -> cuanto entra en ESTA conversacion antes de compactar. Se recupera al compactar.
+//   uso      -> tu cuota de la suscripcion (ventanas de 5h y 7d). NO se recupera hasta el reset.
+//
+// Todo lo de esta fila puede faltar y hay que tolerarlo:
+//   - `rate_limits` solo existe para suscriptores Claude.ai (Pro/Max), y recien despues de la
+//     primera respuesta de la API. Cada ventana puede faltar por separado.
+//   - `used_percentage` / `remaining_percentage` pueden venir en null al arrancar la sesion.
+// Si no hay ningun dato, la fila entera no se dibuja: mejor una barra corta que una que miente.
+
+const VERDE = '\x1b[32m';
+const AMARILLO = '\x1b[33m';
+const ROJO = '\x1b[31m';
+const GRIS = '\x1b[90m';
+const OFF = '\x1b[0m';
+
+/** Verde/amarillo/rojo segun cuanto queda LIBRE (no cuanto se uso). */
+function colorPorLibre(libre) {
+  if (libre <= 10) return ROJO;
+  if (libre <= 30) return AMARILLO;
+  return VERDE;
+}
+
+/** Barra de 10 bloques. */
+function barra(libre) {
+  const llenos = Math.max(0, Math.min(10, Math.round(libre / 10)));
+  return '█'.repeat(llenos) + '░'.repeat(10 - llenos);
+}
+
+/** "2d21h" / "3h10m" / "45m" / "" — cuanto falta para un reset dado en epoch segundos. */
+function faltaPara(epochSeg) {
+  if (!Number.isFinite(epochSeg)) return '';
+  const min = Math.round((epochSeg * 1000 - Date.now()) / 60000);
+  if (min <= 0) return '';
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60);
+  // La ventana de 7 dias da numeros como "69h27m", que no le dicen nada a nadie.
+  if (h >= 24) return `${Math.floor(h / 24)}d${h % 24}h`;
+  return `${h}h${String(min % 60).padStart(2, '0')}m`;
+}
+
+function filaPresupuesto(p) {
+  const trozos = [];
+
+  // --- Contexto libre de la sesion
+  const cw = p.context_window || {};
+  let libre = cw.remaining_percentage;
+  if (typeof libre !== 'number' && typeof cw.used_percentage === 'number') {
+    libre = 100 - cw.used_percentage;
+  }
+  if (typeof libre === 'number') {
+    const l = Math.max(0, Math.min(100, Math.round(libre)));
+    const c = colorPorLibre(l);
+    // El tamaño de ventana se muestra solo si NO es el default de 200k, que es el caso
+    // interesante: un modelo de contexto extendido cambia por completo el significado del %.
+    const size = cw.context_window_size;
+    const extendida =
+      typeof size !== 'number' || size === 200000
+        ? ''
+        : size >= 1000000
+          ? ` ${+(size / 1000000).toFixed(1)}M`
+          : ` ${Math.round(size / 1000)}k`;
+    trozos.push(`${c}ctx ${barra(l)} ${l}%${OFF}${GRIS} libre${extendida}${OFF}`);
+  }
+
+  // --- Cuota de uso (solo suscriptores Claude.ai)
+  const rl = p.rate_limits || {};
+  for (const [clave, etiq] of [['five_hour', '5h'], ['seven_day', '7d']]) {
+    const v = rl[clave];
+    if (!v || typeof v.used_percentage !== 'number') continue;
+    const usado = Math.max(0, Math.min(100, Math.round(v.used_percentage)));
+    const c = colorPorLibre(100 - usado);
+    const reset = faltaPara(v.resets_at);
+    trozos.push(`${c}${etiq} ${usado}%${OFF}${reset ? `${GRIS} ↻${reset}${OFF}` : ''}`);
+  }
+
+  return trozos.length ? trozos.join(`${GRIS}  ·  ${OFF}`) : '';
+}
 
 /**
  * Sub-agentes EN VUELO de esta sesion, leyendo las fichas que abre subagent-start.js.
@@ -139,5 +227,7 @@ process.stdin.on('end', () => {
     parts.push(`[36m⚙ ${visibles.join(' ')}${resto > 0 ? ` +${resto}` : ''}[0m`);
   }
 
-  process.stdout.write(parts.join('  '));
+  // Fila 2. Se omite entera si no hay ni un dato: una barra a medias confunde mas que ayuda.
+  const fila2 = filaPresupuesto(p);
+  process.stdout.write(parts.join('  ') + (fila2 ? '\n' + fila2 : ''));
 });
