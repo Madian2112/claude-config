@@ -105,6 +105,12 @@
             "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/session-bootstrap.js\"",
             "timeout": 15,
             "statusMessage": "Bootstrap de sesion (cleanup + estado SDD)..."
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/session-title.js\"",
+            "timeout": 10,
+            "statusMessage": "Nombrando la sesion..."
           }
         ]
       },
