@@ -241,11 +241,23 @@ try {
 }
 
 // ------------------------------------------------------------- 5. Sintaxis JS
-for (const f of fs.readdirSync(path.join(ROOT, 'hooks')).filter((x) => x.endsWith('.js'))) {
+// Recursivo a proposito: hooks/lib/ tiene codigo COMPARTIDO por varios hooks, asi que un error
+// de sintaxis ahi los rompe todos a la vez. Es el archivo que menos se puede dar el lujo de
+// quedar sin chequear.
+function jsRecursivo(dir, rel = 'hooks') {
+  const salida = [];
+  for (const d of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (d.isDirectory()) salida.push(...jsRecursivo(path.join(dir, d.name), `${rel}/${d.name}`));
+    else if (d.name.endsWith('.js')) salida.push([path.join(dir, d.name), `${rel}/${d.name}`]);
+  }
+  return salida;
+}
+
+for (const [full, etiqueta] of jsRecursivo(path.join(ROOT, 'hooks'))) {
   try {
-    new (require('vm').Script)(fs.readFileSync(path.join(ROOT, 'hooks', f), 'utf8'), { filename: f });
+    new (require('vm').Script)(fs.readFileSync(full, 'utf8'), { filename: etiqueta });
   } catch (e) {
-    err(`hooks/${f}: error de sintaxis — ${e.message}`);
+    err(`${etiqueta}: error de sintaxis — ${e.message}`);
   }
 }
 

@@ -104,7 +104,8 @@ settings.json             Modelo, permisos, hooks, statusline
 | `session-bootstrap.js` | SessionStart | Cleanup de `agent-outputs` (TTL 24h) y de marcas de cierre (TTL 7d), inyecta changes SDD abiertos, avisa si Engram no está |
 | `post-compact-memory.js` | SessionStart (`compact`) | Inyecta el protocolo AFTER COMPACTION de Engram apenas se compacta el contexto |
 | `session-close-guard.js` | Stop | Bloquea **una vez por sesión** si hubo escrituras y no se llamó a `mem_session_summary` |
-| `subagent-index.js` | SubagentStop | Traza de cada corrida de sub-agente en `_index.jsonl` |
+| `subagent-start.js` | SubagentStart | Abre la ficha del sub-agente en vuelo (tipo + **modelo** + inicio) que lee la statusline |
+| `subagent-index.js` | SubagentStop | Cierra la ficha, calcula duración, traza en `_index.jsonl` y **devuelve una línea al orquestador** |
 | `statusline.js` | statusLine | `proyecto · ‹sesión› · rama* · [modelo] · SDD:change→fase` — el segmento SDD **solo** aparece bajo `dev-orchestrator` (ver abajo) |
 | `validate-config.js` | manual | Valida la consistencia de toda la config — ver abajo |
 
@@ -159,6 +160,21 @@ o con el setting `agent`. La barra usa ese dato para mostrar lo que corresponde 
 | `claude --agent=dev-orchestrator` | `proyecto · ‹sesión› · rama* · [modelo] · SDD:change→fase` |
 | `claude` sin agente | `proyecto · ‹sesión› · rama* · [modelo]` — sin ruido de SDD |
 | `claude --agent=otro` | `proyecto · ‹sesión› · rama* · [modelo] · @nombre-del-agente` |
+
+### Sub-agentes en vuelo
+
+Cuando hay sub-agentes corriendo, la barra cierra con `⚙ sdd-design[opus] sdd-spec[haiku] +1`
+(los 2 más viejos, y `+N` para el resto). Con modelos mixtos por fase, saber **qué está corriendo
+y con qué modelo** es la diferencia entre esperar tranquilo y preguntarse si se colgó.
+
+> **El modelo NO viene en el payload de los hooks.** `SubagentStart` trae `agent_type`,
+> `agent_id`, `prompt` y `description`, y nada más. Se resuelve leyendo el frontmatter de
+> `agents/*.md` — que es donde lo decidimos nosotros, indexado por el campo `name` y **no** por
+> el nombre del archivo, porque no tienen por qué coincidir.
+
+Las fichas viven en `session-state/agent-runs/` (no versionado). Si un sub-agente muere de forma
+sucia, `SubagentStop` nunca corre y la ficha queda huérfana: se descartan las de más de 2h al
+leerlas y `session-bootstrap` las barre al arrancar. Mejor mostrar de menos que mentir.
 
 El segmento `‹sesión›` sale de `session_name`, que **no siempre viene**: aparece solo si nombraste
 la sesión con `--name` o `/rename`, o una vez que existe un título autogenerado. El nombre por

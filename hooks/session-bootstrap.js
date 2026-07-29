@@ -45,17 +45,25 @@ try {
   /* nunca frenamos la sesion por el cleanup */
 }
 
-// Las marcas de session-close-guard son una por sesion y no sirven despues. Sin este barrido
-// el directorio crece para siempre.
-try {
-  const marcasDir = path.join(configDir, 'session-state', 'close-reminders');
-  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  for (const f of fs.existsSync(marcasDir) ? fs.readdirSync(marcasDir) : []) {
-    const full = path.join(marcasDir, f);
-    if (fs.statSync(full).mtimeMs < cutoff) fs.unlinkSync(full);
+// Barrido de estado efimero. Dos directorios, dos TTL:
+//   close-reminders/ -> una marca por sesion, inservible despues (7d)
+//   agent-runs/      -> fichas de sub-agentes EN VUELO. Si un sub-agente muere sucio,
+//                       SubagentStop nunca corre y la ficha queda huerfana mintiendole a la
+//                       statusline. Al arrancar sesion no puede haber ninguno vivo del pasado.
+for (const [sub, ttl] of [
+  ['close-reminders', 7 * 24 * 60 * 60 * 1000],
+  ['agent-runs', 2 * 60 * 60 * 1000],
+]) {
+  try {
+    const dir = path.join(configDir, 'session-state', sub);
+    const cutoff = Date.now() - ttl;
+    for (const f of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
+      const full = path.join(dir, f);
+      if (fs.statSync(full).mtimeMs < cutoff) fs.unlinkSync(full);
+    }
+  } catch {
+    /* ignorar */
   }
-} catch {
-  /* ignorar */
 }
 
 // ------------------------------------------------------- 2. Estado SDD (.atl)

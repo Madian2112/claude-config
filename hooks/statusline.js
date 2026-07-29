@@ -14,6 +14,38 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { RUNS_DIR, etiqueta } = require('./lib/agent-meta');
+
+/**
+ * Sub-agentes EN VUELO de esta sesion, leyendo las fichas que abre subagent-start.js.
+ *
+ * Se descartan las fichas de mas de 2h: si un sub-agente muere de forma sucia, SubagentStop
+ * nunca corre y la ficha queda huerfana para siempre. Mejor mostrar de menos que mentir.
+ */
+function enVuelo(sessionId) {
+  let archivos = [];
+  try {
+    archivos = fs.readdirSync(RUNS_DIR).filter((f) => f.endsWith('.json'));
+  } catch {
+    return [];
+  }
+
+  const corte = Date.now() - 2 * 60 * 60 * 1000;
+  const vivos = [];
+  for (const f of archivos) {
+    try {
+      const full = path.join(RUNS_DIR, f);
+      if (fs.statSync(full).mtimeMs < corte) continue;
+      const ficha = JSON.parse(fs.readFileSync(full, 'utf8'));
+      // Otra sesion en paralelo puede tener sus propios sub-agentes: no son asunto de esta barra.
+      if (sessionId && ficha.session_id && ficha.session_id !== sessionId) continue;
+      vivos.push(ficha);
+    } catch {
+      /* ficha ilegible: se ignora */
+    }
+  }
+  return vivos.sort((a, b) => (a.started_ms || 0) - (b.started_ms || 0));
+}
 
 const CHUNKS = [];
 process.stdin.on('data', (c) => CHUNKS.push(c));
@@ -92,6 +124,16 @@ process.stdin.on('end', () => {
   } else if (agente) {
     // Otro agente principal: mostrar cual, para saber bajo que persona estas trabajando.
     parts.push(`[34m@${agente}[0m`);
+  }
+
+  // Sub-agentes corriendo AHORA, con su modelo. Con 9 sub-agentes y modelos mixtos (opus en
+  // design, haiku en spec), saber que hay en vuelo y con que modelo es la diferencia entre
+  // esperar tranquilo y preguntarse si se colgo.
+  const corriendo = enVuelo(p.session_id || '');
+  if (corriendo.length) {
+    const visibles = corriendo.slice(0, 2).map((f) => etiqueta(f.agent_type, f.model));
+    const resto = corriendo.length - visibles.length;
+    parts.push(`[36m⚙ ${visibles.join(' ')}${resto > 0 ? ` +${resto}` : ''}[0m`);
   }
 
   process.stdout.write(parts.join('  '));
