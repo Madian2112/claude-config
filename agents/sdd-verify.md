@@ -24,6 +24,11 @@ hooks:
           command: "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/atl-only-guard.js\""
           timeout: 10
           statusMessage: "Validando que la escritura sea dentro de .atl/..."
+  PostToolUse:
+    - hooks:
+        - type: command
+          command: "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/detect-subagent-model.js\""
+          timeout: 10
 ---
 
 # SDD Verify — Validación de Implementación

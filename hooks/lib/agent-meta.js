@@ -61,10 +61,41 @@ function modeloDe(agentType) {
   return meta ? meta.model : '';
 }
 
-/** Etiqueta compacta para UI: `sdd-design[opus]`, o solo `Explore` si no sabemos el modelo. */
-function etiqueta(agentType, model) {
+/**
+ * Familia de un id de modelo: 'claude-opus-5' -> 'opus'. Devuelve '' si no la reconoce.
+ *
+ * Hace falta porque comparamos peras con manzanas: el frontmatter declara un alias corto
+ * ('opus') y el transcript registra el id completo ('claude-opus-5'). Comparar los strings
+ * crudos daria "mismatch" siempre.
+ */
+function familia(modelId) {
+  const m = String(modelId || '').toLowerCase().match(/\b(opus|sonnet|haiku|fable)\b/);
+  return m ? m[1] : '';
+}
+
+/**
+ * ¿El modelo REAL contradice al declarado?
+ *
+ * Conservador a proposito: solo afirma el desacuerdo cuando reconoce AMBAS familias. Si el
+ * declarado es `inherit`, no hay nada que contradecir. Ante la duda decimos que no, porque
+ * una alarma falsa que salta seguido se vuelve ruido y se deja de mirar.
+ */
+function discrepa(declarado, real) {
+  if (!declarado || !real || declarado === 'inherit') return false;
+  const a = familia(declarado);
+  const b = familia(real);
+  return !!a && !!b && a !== b;
+}
+
+/**
+ * Etiqueta compacta para UI: `sdd-design[opus]`.
+ * Si el modelo real contradice al declarado, lo grita: `sdd-design[opus≠sonnet]`.
+ */
+function etiqueta(agentType, model, modelReal) {
   const m = model || modeloDe(agentType);
-  return m && m !== 'inherit' ? `${agentType}[${m}]` : agentType;
+  if (discrepa(m, modelReal)) return `${agentType}[${familia(m)}≠${familia(modelReal)}]`;
+  const mostrar = familia(modelReal) || (m && m !== 'inherit' ? m : '');
+  return mostrar ? `${agentType}[${mostrar}]` : agentType;
 }
 
 /** Duracion legible y corta: 45s, 3m12s, 1h04m. */
@@ -77,4 +108,21 @@ function duracion(ms) {
   return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}m`;
 }
 
-module.exports = { configDir, RUNS_DIR, OUT_DIR, cargarAgentes, modeloDe, etiqueta, duracion };
+/** Ruta de la ficha de una corrida. El agent_id viene del payload: se sanea siempre. */
+function fichaDe(agentId) {
+  return path.join(RUNS_DIR, `${String(agentId).replace(/[^\w.-]/g, '_').slice(0, 120)}.json`);
+}
+
+function leerFicha(agentId) {
+  try {
+    return JSON.parse(fs.readFileSync(fichaDe(agentId), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+module.exports = {
+  configDir, RUNS_DIR, OUT_DIR,
+  cargarAgentes, modeloDe, etiqueta, duracion,
+  familia, discrepa, fichaDe, leerFicha,
+};

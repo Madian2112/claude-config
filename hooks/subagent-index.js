@@ -28,7 +28,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { RUNS_DIR, OUT_DIR, modeloDe, etiqueta, duracion } = require('./lib/agent-meta');
+const { OUT_DIR, modeloDe, etiqueta, duracion, discrepa, familia, fichaDe } = require('./lib/agent-meta');
 
 const CHUNKS = [];
 process.stdin.on('data', (c) => CHUNKS.push(c));
@@ -49,9 +49,6 @@ process.stdin.on('end', () => {
   }
   process.exit(0);
 });
-
-/** El agent_id viene del payload: se sanea antes de convertirlo en nombre de archivo. */
-const fichaDe = (agentId) => path.join(RUNS_DIR, `${agentId.replace(/[^\w.-]/g, '_').slice(0, 120)}.json`);
 
 function main(p) {
   const agentType = p.agent_type || 'desconocido';
@@ -75,7 +72,8 @@ function main(p) {
     }
   }
 
-  const model = (ficha && ficha.model) || modeloDe(agentType);
+  const declarado = (ficha && ficha.model) || modeloDe(agentType);
+  const real = (ficha && ficha.model_real) || '';
   const ms = ficha && ficha.started_ms ? Date.now() - ficha.started_ms : NaN;
   const dur = duracion(ms);
 
@@ -84,7 +82,10 @@ function main(p) {
     ts: new Date().toISOString(),
     agent_type: agentType,
     agent_id: agentId,
-    model: model || null,
+    model_declarado: declarado || null,
+    // null = no se pudo probar a quien pertenecia el turno. NO es lo mismo que "coincide".
+    model_real: real || null,
+    model_real_via: (ficha && ficha.model_real_via) || null,
     duration_ms: Number.isFinite(ms) ? ms : null,
     session_id: p.session_id || '',
     transcript_path: p.transcript_path || '',
@@ -99,5 +100,18 @@ function main(p) {
   }
 
   // ------------------------------- 3. Una linea de vuelta al orquestador
-  return `✅ sub-agente ${etiqueta(agentType, model)} terminó${dur ? ` en ${dur}` : ''}.`;
+  const base = `✅ sub-agente ${etiqueta(agentType, declarado, real)} terminó${dur ? ` en ${dur}` : ''}.`;
+
+  if (discrepa(declarado, real)) {
+    return (
+      `⚠️ MODELO INESPERADO — ${agentType} declara \`model: ${declarado}\` en su frontmatter, ` +
+      `pero Claude Code lo corrió con \`${real}\` (familia ${familia(real)}). ` +
+      `Terminó${dur ? ` en ${dur}` : ''}.\n` +
+      'Revisá si el alias del frontmatter sigue existiendo o si hay un allowlist de modelos ' +
+      'de la organización pisando la decisión. El costo y la calidad de esta fase NO son los ' +
+      'que planificaste.'
+    );
+  }
+
+  return base;
 }

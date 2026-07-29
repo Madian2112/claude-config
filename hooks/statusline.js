@@ -14,7 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { RUNS_DIR, etiqueta } = require('./lib/agent-meta');
+const { RUNS_DIR, etiqueta, discrepa } = require('./lib/agent-meta');
 
 /**
  * Sub-agentes EN VUELO de esta sesion, leyendo las fichas que abre subagent-start.js.
@@ -131,7 +131,10 @@ process.stdin.on('end', () => {
   // esperar tranquilo y preguntarse si se colgo.
   const corriendo = enVuelo(p.session_id || '');
   if (corriendo.length) {
-    const visibles = corriendo.slice(0, 2).map((f) => etiqueta(f.agent_type, f.model));
+    // Los que corren con un modelo distinto al declarado van PRIMERO. Si no, la truncacion a 2
+    // puede esconder justo la alarma detras del "+N" — una alarma tapada no es una alarma.
+    corriendo.sort((a, b) => Number(discrepa(b.model, b.model_real)) - Number(discrepa(a.model, a.model_real)));
+    const visibles = corriendo.slice(0, 2).map((f) => etiqueta(f.agent_type, f.model, f.model_real));
     const resto = corriendo.length - visibles.length;
     parts.push(`[36m⚙ ${visibles.join(' ')}${resto > 0 ? ` +${resto}` : ''}[0m`);
   }

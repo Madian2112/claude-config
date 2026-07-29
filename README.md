@@ -99,7 +99,8 @@ settings.json             Modelo, permisos, hooks, statusline
 | `clean-arch-guard.js` | PreToolUse (Edit·MultiEdit·Write) | **Bloquea** violaciones de capas: EF/HTTP en Domain, HttpContext/DbContext en Application, mensajes de negocio en Repository, DTOs como `record`, sufijos prohibidos |
 | `git-guard.js` | PreToolUse (Bash) | **Bloquea** `git commit/push/merge/rebase` en repos de proyecto. Exento el repo de config |
 | `precommit-validate.js` | PreToolUse (Bash) | **Bloquea** `git commit` en ESTE repo si `validate-config.js` falla. La config no se commitea rota |
-| `atl-only-guard.js` | PreToolUse — scoped a `sdd-verify` | **Bloquea** escrituras fuera de `.atl/`. Enganchado por el campo `hooks:` del frontmatter del agente, no global |
+| `atl-only-guard.js` | PreToolUse — scoped a 8 sub-agentes | **Bloquea** escrituras fuera de `.atl/`. Enganchado por el campo `hooks:` del frontmatter, no global. Lo llevan todas las fases SDD **menos `sdd-apply`**, que es la única que escribe código de proyecto |
+| `detect-subagent-model.js` | PostToolUse — scoped a los sub-agentes | Lee del transcript el modelo **real** que la plataforma asignó y lo compara con el declarado |
 | `auto-format.js` | PostToolUse (Edit·MultiEdit·Write) | `dotnet format` / `prettier` sobre el archivo tocado. No compila |
 | `session-bootstrap.js` | SessionStart | Cleanup de `agent-outputs` (TTL 24h) y de marcas de cierre (TTL 7d), inyecta changes SDD abiertos, avisa si Engram no está |
 | `post-compact-memory.js` | SessionStart (`compact`) | Inyecta el protocolo AFTER COMPACTION de Engram apenas se compacta el contexto |
@@ -168,9 +169,31 @@ Cuando hay sub-agentes corriendo, la barra cierra con `⚙ sdd-design[opus] sdd-
 y con qué modelo** es la diferencia entre esperar tranquilo y preguntarse si se colgó.
 
 > **El modelo NO viene en el payload de los hooks.** `SubagentStart` trae `agent_type`,
-> `agent_id`, `prompt` y `description`, y nada más. Se resuelve leyendo el frontmatter de
-> `agents/*.md` — que es donde lo decidimos nosotros, indexado por el campo `name` y **no** por
-> el nombre del archivo, porque no tienen por qué coincidir.
+> `agent_id`, `prompt` y `description`, y nada más.
+
+Se muestran **dos** modelos, y la diferencia es el punto:
+
+| En la barra | Significa |
+|---|---|
+| `sdd-design[opus]` | El declarado en `agents/sdd-design.md`. Si además se pudo leer el real, coinciden |
+| `sdd-design[opus≠sonnet]` | **Declaraste `opus` y Claude Code lo corrió con `sonnet`.** Ni el costo ni la calidad de esa fase son los que planificaste |
+
+El **declarado** sale del frontmatter (indexado por el campo `name`, **no** por el nombre del
+archivo, porque no tienen por qué coincidir). El **real** sale del transcript: cada turno del
+assistant registra un `message.model` con el id completo que la plataforma usó de verdad. Lo lee
+`detect-subagent-model.js`, enganchado como `PostToolUse` **dentro** de cada sub-agente — ahí el
+payload trae `agent_id`, así que la correlación "este modelo es de ESTA corrida" es exacta y no
+hay que adivinar cuando corren varios en paralelo.
+
+> **Regla de oro del detector: ante la duda, no afirma nada.** Solo acepta un turno como propio
+> del sub-agente si `isSidechain === true`, o si el `sessionId` del turno difiere del de la sesión
+> padre (transcript propio). Cualquier otro turno se ignora: leer uno del hilo principal
+> produciría un mismatch fantasma. Cuando no puede probarlo, deja `model_real` sin setear y la UI
+> cae al declarado — `null` en el índice significa **"no se pudo determinar"**, que no es lo mismo
+> que "coincide".
+
+Los que discrepan se ordenan **primero** en la barra: con truncación a 2 elementos, una alarma
+escondida detrás del `+N` no es una alarma.
 
 Las fichas viven en `session-state/agent-runs/` (no versionado). Si un sub-agente muere de forma
 sucia, `SubagentStop` nunca corre y la ficha queda huérfana: se descartan las de más de 2h al
