@@ -8,7 +8,7 @@
  *
  * Dos filas (cada linea impresa es una fila):
  *   ~/erp-facturacion  feat/12345-alta-vales*  [sonnet]  SDD:alta-vales→design
- *   ctx ████████░░ 78% libre  ·  5h 24%  ·  7d 41% (reset 3h10m)
+ *   ctx ████████░░ 78% libre  ·  5h 24% ↻3h10m
  *
  * La segunda fila responde "¿cuanto me queda?" sin tener que preguntar: contexto libre de la
  * sesion y consumo de los limites de uso. Los dos datos vienen en el payload del statusLine
@@ -22,6 +22,39 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { RUNS_DIR, etiqueta, discrepa } = require('./lib/agent-meta');
 
+
+/** Rama + dirty con cache en disco por cwd (TTL 5s). Ante cualquier problema, devuelve null. */
+function gitCacheado(cwd) {
+  const clave = Buffer.from(cwd).toString('base64url').slice(-40);
+  const cacheFile = path.join(RUNS_DIR, '..', `git-${clave}.json`);
+
+  try {
+    const st = fs.statSync(cacheFile);
+    if (Date.now() - st.mtimeMs < 5000) return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+  } catch {
+    /* sin cache valida: se calcula */
+  }
+
+  const r = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd, encoding: 'utf8', timeout: 3000 });
+  if (r.status !== 0) return null;
+
+  const dato = {
+    branch: (r.stdout || '').trim(),
+    dirty:
+      (spawnSync('git', ['status', '--porcelain'], { cwd, encoding: 'utf8', timeout: 3000 }).stdout || '').trim()
+        .length > 0
+        ? '*'
+        : '',
+  };
+
+  try {
+    fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
+    fs.writeFileSync(cacheFile, JSON.stringify(dato), 'utf8');
+  } catch {
+    /* el cache es un lujo, no un requisito */
+  }
+  return dato;
+}
 
 // ---------------------------------------------------------------- Fila 2: presupuesto
 //
@@ -90,15 +123,17 @@ function filaPresupuesto(p) {
     trozos.push(`${c}ctx ${barra(l)} ${l}%${OFF}${GRIS} libre${extendida}${OFF}`);
   }
 
-  // --- Cuota de uso (solo suscriptores Claude.ai)
-  const rl = p.rate_limits || {};
-  for (const [clave, etiq] of [['five_hour', '5h'], ['seven_day', '7d']]) {
-    const v = rl[clave];
-    if (!v || typeof v.used_percentage !== 'number') continue;
-    const usado = Math.max(0, Math.min(100, Math.round(v.used_percentage)));
+  // --- Cuota de uso: SOLO la ventana de 5 horas.
+  //
+  // La de 7 dias (`rate_limits.seven_day`) existe en el payload y se omite a proposito: es la
+  // que se agota lento y sobre la que no se toma ninguna decision en el momento. La de 5h es la
+  // que te frena HOY, y una barra con dos numeros que compiten hace que no mires ninguno.
+  const cinco = (p.rate_limits || {}).five_hour;
+  if (cinco && typeof cinco.used_percentage === 'number') {
+    const usado = Math.max(0, Math.min(100, Math.round(cinco.used_percentage)));
     const c = colorPorLibre(100 - usado);
-    const reset = faltaPara(v.resets_at);
-    trozos.push(`${c}${etiq} ${usado}%${OFF}${reset ? `${GRIS} ↻${reset}${OFF}` : ''}`);
+    const reset = faltaPara(cinco.resets_at);
+    trozos.push(`${c}5h ${usado}%${OFF}${reset ? `${GRIS} ↻${reset}${OFF}` : ''}`);
   }
 
   return trozos.length ? trozos.join(`${GRIS}  ·  ${OFF}`) : '';
@@ -157,21 +192,13 @@ process.stdin.on('end', () => {
     parts.push(`[90m‹${corta}›[0m`);
   }
 
-  // Rama + dirty flag
-  const git = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
-    cwd,
-    encoding: 'utf8',
-    timeout: 3000,
-  });
-  if (git.status === 0) {
-    const branch = (git.stdout || '').trim();
-    const dirty =
-      (spawnSync('git', ['status', '--porcelain'], { cwd, encoding: 'utf8', timeout: 3000 }).stdout || '').trim()
-        .length > 0
-        ? '*'
-        : '';
-    if (branch) parts.push(`[33m${branch}${dirty}[0m`);
-  }
+  // Rama + dirty flag, con cache de 5s.
+  //
+  // `git status --porcelain` en un repo grande es lento, y con `refreshInterval` esto corre cada
+  // pocos segundos aunque no toques nada. La doc avisa explicitamente que la statusline no debe
+  // colgarse en comandos lentos. 5s es imperceptible para el ojo y saca la mayoria de los spawns.
+  const git = gitCacheado(cwd);
+  if (git && git.branch) parts.push(`[33m${git.branch}${git.dirty}[0m`);
 
   // Modelo activo
   const model = (p.model && (p.model.display_name || p.model.id)) || '';

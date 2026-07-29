@@ -92,7 +92,8 @@
 
   "statusLine": {
     "type": "command",
-    "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/statusline.js\""
+    "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/statusline.js\"",
+    "refreshInterval": 15
   },
 
   "hooks": {

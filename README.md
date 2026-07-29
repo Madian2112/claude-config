@@ -176,7 +176,11 @@ Son **dos recursos distintos** que se confunden todo el tiempo:
 | | Qué mide | ¿Se recupera? |
 |---|---|---|
 | `ctx` | Cuánto entra en **esta conversación** antes de compactar | ✅ Sí, al compactar |
-| `5h` / `7d` | Tu **cuota de suscripción** (ventanas de 5 horas y 7 días) | ❌ No, hasta el `↻reset` |
+| `5h` | Tu **cuota de suscripción** en la ventana de 5 horas | ❌ No, hasta el `↻reset` |
+
+> La ventana de **7 días** (`rate_limits.seven_day`) viene en el payload y **se omite a propósito**:
+> se agota lento y no se toma ninguna decisión con ella en el momento. La de 5h es la que te frena
+> hoy, y dos números compitiendo hacen que no mires ninguno.
 
 Los colores van por lo que **queda libre**: verde >30%, amarillo ≤30%, rojo ≤10%.
 
@@ -190,6 +194,27 @@ que calcular nada ni consultar nada. Pero **los dos pueden faltar**, y la doc lo
 Si no hay ningún dato, **la fila entera no se dibuja**. Una barra a medias confunde más que ayuda.
 El tamaño de ventana se muestra solo cuando **no** es el default de 200k (`94% libre 1M`), porque
 ahí el porcentaje significa otra cosa.
+
+#### Cada cuánto se actualiza (spoiler: no es tiempo real)
+
+El script **no corre continuamente**. Según la doc, se dispara al arrancar la sesión y después
+cuando: llega un mensaje nuevo del assistant, termina un `/compact`, cambia el permission mode,
+se togglea vim mode, o vence un `refreshInterval`. Todo con debounce de 300ms.
+
+Y los datos que muestra vienen **de la última respuesta de la API**. O sea:
+
+- `ctx` se mueve **una vez por turno**. Durante un turno largo con muchas tool calls, el número
+  que ves es el del turno anterior — vas consumiendo contexto sin que la barra se entere.
+- `5h` igual: se actualiza cuando hay respuesta de la API, no mientras la mirás.
+
+Por eso `settings.json` setea **`refreshInterval: 15`**. Sin eso, los disparadores por evento se
+apagan cuando la sesión está quieta y pasan dos cosas feas: el contador `↻3h10m` queda **congelado
+en una cuenta regresiva vieja**, y el segmento `⚙` de sub-agentes no se refresca justo cuando el
+orquestador está esperando en background — los dos casos que la doc nombra explícitamente.
+
+Como eso multiplica las corridas, la rama y el dirty flag ahora se **cachean 5 segundos** en
+`session-state/`. `git status --porcelain` en un repo grande es lento y la doc avisa que una
+statusline lenta se cuelga: 20 corridas seguidas tardan menos de un segundo.
 
 ### Sub-agentes en vuelo
 
