@@ -83,8 +83,24 @@ Windows + **Git for Windows** (Git Bash) + Node.js.
 
 Claude Code carga automáticamente `name` + `description` de cada skill en `~/.claude/skills/` al
 arrancar, y trae el `SKILL.md` completo recién cuando el trigger matchea — no hace falta pedirlo.
-Además, las skills de stack declaran `paths:`, así que se activan **determinísticamente** al tocar
-archivos que matcheen (`**/*.cs`, `**/*.ts`, `**/*.sql`, etc.).
+
+Las skills de stack además declaran `paths:`. **Cuidado con qué hace ese campo**: según la doc,
+`paths` son "glob patterns that **limit** when this skill is activated". Es un **filtro que
+restringe**, no un trigger que garantiza:
+
+- Con `paths`, la skill **no** se auto-carga cuando trabajás fuera de esos globs. Eso es lo que
+  compra: que `sql-standards` no aparezca mientras tocás Angular.
+- Pero tocar un archivo que matchea **no obliga** a que la skill se cargue. La decisión sigue
+  siendo del modelo sobre la `description`. `paths` acota el universo, no dispara.
+
+**Consecuencia práctica:** si una regla tiene que cumplirse SÍ o SÍ, no alcanza con una skill.
+Va en un hook (`clean-arch-guard.js` es exactamente eso) o se pide explícitamente con el tool
+`Skill`. La skill enseña; el hook obliga.
+
+> Corolario del mismo error: **una skill no puede precargar otras skills.** El campo `skills:`
+> existe solo en el frontmatter de un SUB-AGENTE, no en `SKILL.md`. Ponerlo ahí no falla — se
+> ignora en silencio. `validate-config.js` ahora valida el frontmatter contra un schema cerrado
+> justamente por esto.
 
 Ver `~/.claude/skills/SKILL-REGISTRY.md` como cheat-sheet humano de qué hace cada una.
 
@@ -101,7 +117,11 @@ Restricciones de plataforma, no de estilo. Aplican a todo lo que corra vía el t
   listado en `tools`). Ante ambigüedad: elegir la interpretación más conservadora, seguir, y
   registrarla en `## Assumptions & Open Questions` del artifact. El orquestador escala al usuario.
 - **NO pueden spawnear otros sub-agentes** salvo que `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` esté
-  seteado (acá está en `2`, para que `sdd-verify` pueda lanzar Judgment Day).
+  seteado. Acá está en **`3`**, y la cadena más larga es exactamente esa:
+  `sdd-verify` (1) → `judgment-day` (2) → `jd-judge` ∥ `jd-fixer` (3).
+  Era `2` cuando Judgment Day era una skill (se cargaba DENTRO de `sdd-verify`, sin gastar nivel).
+  Al volverse agente propio pasó a ocupar su propio nivel — que es el precio de tener identidad
+  y contexto separados.
 - Corriendo en **background** pierden varios tools nativos; conservan `Read`, `Grep`, `Glob`,
   `Bash`, `Edit`, `Write`, `Skill`, `WebFetch`, `WebSearch` y **todos** los MCP.
 

@@ -12,15 +12,33 @@ color: red
 skills:
   - sdd-verification-protocol
   - sdd-artifact-protocol
+# "Solo lectura" acá significa "no toca codigo de proyecto", NO "no escribe nada": este agente
+# tiene que producir verify-report.md y tech-debt.md. Esa restriccion es sobre el PATH, no sobre
+# el tool, asi que `disallowedTools` no puede expresarla — sacarle Write lo romperia. El guard
+# permite escribir bajo .atl/ y rechaza todo lo demas. Enforcement, no promesa.
+hooks:
+  PreToolUse:
+    - matcher: "Edit|MultiEdit|Write"
+      hooks:
+        - type: command
+          command: "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/atl-only-guard.js\""
+          timeout: 10
+          statusMessage: "Validando que la escritura sea dentro de .atl/..."
+  PostToolUse:
+    - hooks:
+        - type: command
+          command: "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/detect-subagent-model.js\""
+          timeout: 10
 ---
 
 # SDD Verify — Validación de Implementación
 
 Sos un sub-agente EJECUTOR. Hacés la verificación VOS MISMO.
 NO delegás el trabajo de verificación: la verificación la hacés VOS.
-**Única excepción:** podés lanzar la skill `judgment-day` (que spawnea dos jueces ciegos en
-paralelo) cuando se cumplen los criterios de escalamiento de `sdd-verification-protocol` §7.
-El spawn anidado está habilitado (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=2`). Si escalás,
+**Única excepción:** podés delegar al agente `judgment-day` (que a su vez spawnea dos jueces
+ciegos en paralelo) cuando se cumplen los criterios de escalamiento de `sdd-verification-protocol` §7.
+El spawn anidado está habilitado (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=3`: vos sos el nivel 1,
+judgment-day el 2, sus jueces el 3). Si escalás,
 declaralo en el reporte con el motivo — nunca en silencio.
 
 ## NO Podés Preguntarle al Usuario (restricción de plataforma)

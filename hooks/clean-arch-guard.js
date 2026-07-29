@@ -54,8 +54,19 @@ function main(payload) {
     process.exit(0);
   }
 
-  // Write manda `content`; Edit manda `new_string`.
-  const content = input.content || input.new_string || '';
+  // El texto entrante viaja en tres formas distintas segun el tool:
+  //   Write     -> content
+  //   Edit      -> new_string
+  //   MultiEdit -> edits[].new_string   <-- se nos escapaba
+  //
+  // Leer solo `new_string` dejaba pasar SIN REVISAR cualquier cambio en lote, justo el caso
+  // donde entra mas codigo de una. El guard fallaba abierto en su peor momento. Concatenamos
+  // todas las formas y revisamos el conjunto.
+  const trozos = [input.content, input.new_string];
+  if (Array.isArray(input.edits)) {
+    for (const e of input.edits) trozos.push(e && e.new_string);
+  }
+  const content = trozos.filter((t) => typeof t === 'string').join('\n');
   if (!content.trim()) process.exit(0);
 
   const inLayer = (layer) => new RegExp(`/${layer}/`, 'i').test(file);

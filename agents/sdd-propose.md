@@ -11,6 +11,24 @@ effort: medium
 color: purple
 skills:
   - sdd-artifact-protocol
+# Esta fase produce ARTIFACTS, no codigo de proyecto. La restriccion es sobre el PATH y no
+# sobre el tool (el agente necesita Write para su propio artifact), asi que `disallowedTools`
+# no puede expresarla: la enforcea atl-only-guard.js.
+# Registra el modelo REAL que Claude Code le asigno, leido del transcript. Sin esto solo
+# sabriamos el que declaramos nosotros aca abajo, que no prueba nada.
+hooks:
+  PreToolUse:
+    - matcher: "Edit|MultiEdit|Write"
+      hooks:
+        - type: command
+          command: "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/atl-only-guard.js\""
+          timeout: 10
+          statusMessage: "Validando que la escritura sea dentro de .atl/..."
+  PostToolUse:
+    - hooks:
+        - type: command
+          command: "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/detect-subagent-model.js\""
+          timeout: 10
 ---
 
 # SDD Propose — Propuesta de Cambio

@@ -30,10 +30,13 @@ por defecto Claude Code deja en el home, pero acá vive **adentro** de esta carp
 ruta (`path.resolve(__dirname, '..')`), con `CLAUDE_CONFIG_DIR` como override. No dependen de
 `os.homedir()`, así que funcionan aunque muevas la carpeta.
 
-Lo único con la ruta escrita a mano son los comandos de hook en `settings.json`
-(`node "$HOME/.claude/hooks/..."`). **Asunción de este setup: la carpeta siempre vive en el home
-del usuario actual** (`$HOME/.claude`), así que esas rutas son estables en cualquier máquina.
-Si algún día la movés a otro lado, hay que actualizar esas 7 líneas.
+**Los comandos de hook en `settings.json` también.** Usan `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`:
+si moviste la carpeta y apuntaste `CLAUDE_CONFIG_DIR` ahí, los hooks siguen encontrándose solos;
+si no la moviste, cae al default de siempre. No hay ninguna ruta que actualizar a mano.
+
+> Antes esas líneas decían `$HOME/.claude` fijo, lo cual contradecía en silencio al párrafo de
+> arriba: los scripts se ubicaban solos pero `settings.json` no los encontraba. Moverla te dejaba
+> con los hooks muertos y ningún mensaje de error.
 
 ## Requisitos
 
@@ -93,11 +96,17 @@ settings.json             Modelo, permisos, hooks, statusline
 
 | Hook | Evento | Qué hace |
 |------|--------|----------|
-| `clean-arch-guard.js` | PreToolUse (Edit·Write) | **Bloquea** violaciones de capas: EF/HTTP en Domain, HttpContext/DbContext en Application, mensajes de negocio en Repository, DTOs como `record`, sufijos prohibidos |
+| `clean-arch-guard.js` | PreToolUse (Edit·MultiEdit·Write) | **Bloquea** violaciones de capas: EF/HTTP en Domain, HttpContext/DbContext en Application, mensajes de negocio en Repository, DTOs como `record`, sufijos prohibidos |
 | `git-guard.js` | PreToolUse (Bash) | **Bloquea** `git commit/push/merge/rebase` en repos de proyecto. Exento el repo de config |
-| `auto-format.js` | PostToolUse (Edit·Write) | `dotnet format` / `prettier` sobre el archivo tocado. No compila |
-| `session-bootstrap.js` | SessionStart | Cleanup de `agent-outputs` (TTL 24h), inyecta changes SDD abiertos, avisa si Engram no está |
-| `subagent-index.js` | SubagentStop | Traza de cada corrida de sub-agente en `_index.jsonl` |
+| `precommit-validate.js` | PreToolUse (Bash) | **Bloquea** `git commit` en ESTE repo si `validate-config.js` falla. La config no se commitea rota |
+| `atl-only-guard.js` | PreToolUse — scoped a 8 sub-agentes | **Bloquea** escrituras fuera de `.atl/`. Enganchado por el campo `hooks:` del frontmatter, no global. Lo llevan todas las fases SDD **menos `sdd-apply`**, que es la única que escribe código de proyecto |
+| `detect-subagent-model.js` | PostToolUse — scoped a los sub-agentes | Lee del transcript el modelo **real** que la plataforma asignó y lo compara con el declarado |
+| `auto-format.js` | PostToolUse (Edit·MultiEdit·Write) | `dotnet format` / `prettier` sobre el archivo tocado. No compila |
+| `session-bootstrap.js` | SessionStart | Cleanup de `agent-outputs` (TTL 24h) y de marcas de cierre (TTL 7d), inyecta changes SDD abiertos, avisa si Engram no está |
+| `post-compact-memory.js` | SessionStart (`compact`) | Inyecta el protocolo AFTER COMPACTION de Engram apenas se compacta el contexto |
+| `session-close-guard.js` | Stop | Bloquea **una vez por sesión** si hubo escrituras y no se llamó a `mem_session_summary` |
+| `subagent-start.js` | SubagentStart | Abre la ficha del sub-agente en vuelo (tipo + **modelo** + inicio) que lee la statusline |
+| `subagent-index.js` | SubagentStop | Cierra la ficha, calcula duración, traza en `_index.jsonl` y **devuelve una línea al orquestador** |
 | `statusline.js` | statusLine | `proyecto · ‹sesión› · rama* · [modelo] · SDD:change→fase` — el segmento SDD **solo** aparece bajo `dev-orchestrator` (ver abajo) |
 | `validate-config.js` | manual | Valida la consistencia de toda la config — ver abajo |
 
@@ -107,16 +116,37 @@ settings.json             Modelo, permisos, hooks, statusline
 node hooks/validate-config.js     # exit 0 si esta todo bien, 1 si hay errores
 ```
 
-Corrélo **antes de commitear cambios en esta config**. Detecta lo que se rompe al borrar o
-renombrar cosas, que es de donde salieron todos los problemas históricos de este repo:
+Ya no hace falta que te acuerdes: el hook `precommit-validate.js` lo corre solo y **bloquea el
+`git commit`** si algo está roto. Corrélo a mano igual cuando quieras feedback rápido.
+
+Detecta lo que se rompe al borrar o renombrar cosas, que es de donde salieron todos los problemas
+históricos de este repo:
 
 1. Frontmatter YAML ausente o roto en `agents/` y `skills/`
-2. Un agente que precarga (`skills:`) una skill que ya no existe → **el agente no arranca**
-3. Referencias colgadas en `SKILL-REGISTRY.md` a skills borradas
-4. Skills de stack sin compact rules en el registry → el orquestador nunca las inyecta
-5. Hooks de `settings.json` apuntando a archivos inexistentes
-6. `model`, `effort` o `color` inválidos en el frontmatter de un agente
-7. Errores de sintaxis en los hooks
+2. **Campos de frontmatter que no existen en el schema** → se ignoran en silencio (ver abajo)
+3. Un agente que precarga (`skills:`) una skill que ya no existe → **el agente no arranca**
+4. Referencias colgadas en `SKILL-REGISTRY.md` a skills borradas
+5. Skills de stack sin compact rules en el registry → el orquestador nunca las inyecta
+6. Hooks de `settings.json` apuntando a archivos inexistentes
+7. `model`, `effort` o `color` inválidos en el frontmatter de un agente
+8. Errores de sintaxis en los hooks
+
+### El chequeo de schema (punto 2) y por qué existe
+
+`skills/arch-review` y `skills/tdd` declaraban `skills:` en su frontmatter, convencidas de que
+precargaban `cc-solid` y compañía. **Ese campo no existe en `SKILL.md`** — es campo de sub-agente.
+Claude Code lo ignoraba sin decir nada, y las dos corrían **sin una sola regla cargada**.
+
+Un campo mal escrito no explota: no hace nada. Por eso el validador compara contra un **schema
+cerrado** y no contra una lista de prohibidos. Ojo con el casing, que son dos schemas distintos:
+
+| | Campo de herramientas denegadas | Otros ejemplos |
+|---|---|---|
+| `skills/*/SKILL.md` | `disallowed-tools` (kebab) | `allowed-tools`, `argument-hint`, `paths` |
+| `agents/*.md` | `disallowedTools` (camel) | `tools`, `permissionMode`, `maxTurns`, `skills` |
+
+Una skill **no puede precargar otras skills**. Si necesitás reglas cargadas, pedilas en el body
+con el tool `Skill` o usá `context: fork` + `agent:`.
 
 **Criterio**: un hook falla siempre **abierto** (nunca frena el trabajo por un error propio),
 salvo los dos guards, cuyo trabajo ES bloquear.
@@ -132,6 +162,97 @@ o con el setting `agent`. La barra usa ese dato para mostrar lo que corresponde 
 | `claude` sin agente | `proyecto · ‹sesión› · rama* · [modelo]` — sin ruido de SDD |
 | `claude --agent=otro` | `proyecto · ‹sesión› · rama* · [modelo] · @nombre-del-agente` |
 
+### Segunda fila: cuánto te queda
+
+La statusline imprime **dos filas** (cada línea impresa es una fila):
+
+```
+~/erp-facturacion  feat/12345-alta-vales*  [sonnet]  SDD:alta-vales→design
+ctx ████████░░ 78% libre  ·  5h 24% ↻3h10m  ·  7d 41% ↻2d21h
+```
+
+Son **dos recursos distintos** que se confunden todo el tiempo:
+
+| | Qué mide | ¿Se recupera? |
+|---|---|---|
+| `ctx` | Cuánto entra en **esta conversación** antes de compactar | ✅ Sí, al compactar |
+| `5h` | Tu **cuota de suscripción** en la ventana de 5 horas | ❌ No, hasta el `↻reset` |
+
+> La ventana de **7 días** (`rate_limits.seven_day`) viene en el payload y **se omite a propósito**:
+> se agota lento y no se toma ninguna decisión con ella en el momento. La de 5h es la que te frena
+> hoy, y dos números compitiendo hacen que no mires ninguno.
+
+Los colores van por lo que **queda libre**: verde >30%, amarillo ≤30%, rojo ≤10%.
+
+Ambos datos ya vienen en el payload del `statusLine` (`context_window` y `rate_limits`): no hay
+que calcular nada ni consultar nada. Pero **los dos pueden faltar**, y la doc lo dice explícito:
+
+- `rate_limits` existe **solo para suscriptores Claude.ai (Pro/Max)**, y recién después de la
+  primera respuesta de la API. Cada ventana puede faltar por separado.
+- `used_percentage` / `remaining_percentage` pueden venir en `null` al arrancar la sesión.
+
+Si no hay ningún dato, **la fila entera no se dibuja**. Una barra a medias confunde más que ayuda.
+El tamaño de ventana se muestra solo cuando **no** es el default de 200k (`94% libre 1M`), porque
+ahí el porcentaje significa otra cosa.
+
+#### Cada cuánto se actualiza (spoiler: no es tiempo real)
+
+El script **no corre continuamente**. Según la doc, se dispara al arrancar la sesión y después
+cuando: llega un mensaje nuevo del assistant, termina un `/compact`, cambia el permission mode,
+se togglea vim mode, o vence un `refreshInterval`. Todo con debounce de 300ms.
+
+Y los datos que muestra vienen **de la última respuesta de la API**. O sea:
+
+- `ctx` se mueve **una vez por turno**. Durante un turno largo con muchas tool calls, el número
+  que ves es el del turno anterior — vas consumiendo contexto sin que la barra se entere.
+- `5h` igual: se actualiza cuando hay respuesta de la API, no mientras la mirás.
+
+Por eso `settings.json` setea **`refreshInterval: 15`**. Sin eso, los disparadores por evento se
+apagan cuando la sesión está quieta y pasan dos cosas feas: el contador `↻3h10m` queda **congelado
+en una cuenta regresiva vieja**, y el segmento `⚙` de sub-agentes no se refresca justo cuando el
+orquestador está esperando en background — los dos casos que la doc nombra explícitamente.
+
+Como eso multiplica las corridas, la rama y el dirty flag ahora se **cachean 5 segundos** en
+`session-state/`. `git status --porcelain` en un repo grande es lento y la doc avisa que una
+statusline lenta se cuelga: 20 corridas seguidas tardan menos de un segundo.
+
+### Sub-agentes en vuelo
+
+Cuando hay sub-agentes corriendo, la barra cierra con `⚙ sdd-design[opus] sdd-spec[haiku] +1`
+(los 2 más viejos, y `+N` para el resto). Con modelos mixtos por fase, saber **qué está corriendo
+y con qué modelo** es la diferencia entre esperar tranquilo y preguntarse si se colgó.
+
+> **El modelo NO viene en el payload de los hooks.** `SubagentStart` trae `agent_type`,
+> `agent_id`, `prompt` y `description`, y nada más.
+
+Se muestran **dos** modelos, y la diferencia es el punto:
+
+| En la barra | Significa |
+|---|---|
+| `sdd-design[opus]` | El declarado en `agents/sdd-design.md`. Si además se pudo leer el real, coinciden |
+| `sdd-design[opus≠sonnet]` | **Declaraste `opus` y Claude Code lo corrió con `sonnet`.** Ni el costo ni la calidad de esa fase son los que planificaste |
+
+El **declarado** sale del frontmatter (indexado por el campo `name`, **no** por el nombre del
+archivo, porque no tienen por qué coincidir). El **real** sale del transcript: cada turno del
+assistant registra un `message.model` con el id completo que la plataforma usó de verdad. Lo lee
+`detect-subagent-model.js`, enganchado como `PostToolUse` **dentro** de cada sub-agente — ahí el
+payload trae `agent_id`, así que la correlación "este modelo es de ESTA corrida" es exacta y no
+hay que adivinar cuando corren varios en paralelo.
+
+> **Regla de oro del detector: ante la duda, no afirma nada.** Solo acepta un turno como propio
+> del sub-agente si `isSidechain === true`, o si el `sessionId` del turno difiere del de la sesión
+> padre (transcript propio). Cualquier otro turno se ignora: leer uno del hilo principal
+> produciría un mismatch fantasma. Cuando no puede probarlo, deja `model_real` sin setear y la UI
+> cae al declarado — `null` en el índice significa **"no se pudo determinar"**, que no es lo mismo
+> que "coincide".
+
+Los que discrepan se ordenan **primero** en la barra: con truncación a 2 elementos, una alarma
+escondida detrás del `+N` no es una alarma.
+
+Las fichas viven en `session-state/agent-runs/` (no versionado). Si un sub-agente muere de forma
+sucia, `SubagentStop` nunca corre y la ficha queda huérfana: se descartan las de más de 2h al
+leerlas y `session-bootstrap` las barre al arrancar. Mejor mostrar de menos que mentir.
+
 El segmento `‹sesión›` sale de `session_name`, que **no siempre viene**: aparece solo si nombraste
 la sesión con `--name` o `/rename`, o una vez que existe un título autogenerado. El nombre por
 defecto (tipo `my-app-3f`) NO lo popula, así que el segmento simplemente se omite. Se trunca a
@@ -141,6 +262,79 @@ La fase se **trunca en el primer paréntesis, guion o punto y coma** y se corta 
 `state.md` a veces trae prosa después del token (`verify (completado — falta ejecución BD)`) y eso
 se comía toda la barra. El detalle completo se lee donde corresponde: en `state.md` o con
 `/sdd-status`.
+
+## Judgment Day — por qué es un agente y no una skill
+
+```
+/judgment-day  ó  dev-orchestrator  ó  sdd-verify
+        │
+        ▼
+  judgment-day (coordina; SIN Edit ni Write)
+        │
+        ├──► jd-judge  ┐  en paralelo, ciegos, sin Edit/Write
+        ├──► jd-judge  ┘  ninguno sabe del otro
+        │
+        └──► jd-fixer     solo los hallazgos CONFIRMADOS por ambos
+```
+
+**Una skill no crea una identidad**: se carga en el contexto de quien la invoca. Cuando Judgment
+Day era skill y lo lanzaba `dev-orchestrator`, el "juez" **era** el orquestador con instrucciones
+nuevas — mismo contexto, misma persona, mismo color en la UI. Un review adversarial hecho por el
+mismo que orquesta el trabajo no es adversarial: es alguien revisándose a sí mismo.
+
+La separación de roles es **estructural**, no una promesa en prosa:
+
+| Agente | Rol | `Edit`/`Write` |
+|---|---|---|
+| `judgment-day` | Coordina. Nunca revisa ni arregla | ❌ No los tiene |
+| `jd-judge` (×2) | Encuentra problemas. Nunca aprueba ni arregla | ❌ No los tiene |
+| `jd-fixer` | Aplica solo los confirmados | ✅ Sí |
+
+Acá **sí** alcanza con acotar `tools:`, porque la restricción es sobre la herramienta. Compará con
+`sdd-verify`, donde es sobre el *destino* (necesita escribir su reporte) y hace falta un hook.
+
+`skills/judgment-day/SKILL.md` quedó como **lanzador** de 20 líneas con `context: fork` +
+`agent: judgment-day`: `/judgment-day` sigue funcionando, pero el protocolo vive en un solo lugar
+y corre en contexto propio.
+
+> **Costo del cambio: un nivel de anidamiento.** `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` pasó de
+> `2` a `3`, porque la cadena más larga es `sdd-verify` (1) → `judgment-day` (2) → jueces (3).
+> Como skill, JD se cargaba *dentro* de `sdd-verify` sin gastar nivel. Tener identidad propia se
+> paga con profundidad.
+
+### Triage: qué se arregla solo y qué te pregunta
+
+Cada hallazgo confirmado por los dos jueces lleva una **clase**, y esa clase decide el camino:
+
+| Clase | Qué es | Quién lo aplica |
+|---|---|---|
+| `MECANICO` | El fix es evidente y **local**: null check, error tragado, typo, naming, complejidad dentro del método | `jd-fixer`, en el acto. No te molesta |
+| `DISENIO` | El fix **decide algo**: viola capas, cambia una firma o un DTO, toca el modelo de datos, contradice el spec | **Vos**, vía orquestador. JD no lo toca |
+
+Clasifican **los dos jueces por separado**. Si discrepan en la clase, **gana `DISENIO`**.
+
+> **Por qué un gap de arquitectura NUNCA va al fixer.** El mandato de `jd-fixer` es *"no
+> refactorices más allá de lo estrictamente necesario"*. Aplicado a un problema de diseño produce
+> un parche mínimo que lo **tapa**: el re-juicio da limpio, el gate aprueba, y la deuda llega a
+> producción con sello de calidad. Un cambio de diseño lo hace `sdd-design`, que es el dueño de
+> `design.md`.
+
+Por eso hay **tres** estados terminales, y `NEEDS_DECISION` gana sobre `APPROVED`:
+
+| Estado | Cuándo | Qué hace el orquestador |
+|---|---|---|
+| `APPROVED ✅` | Jueces limpios **y** cero `DISENIO` | Sigue el flujo |
+| `NEEDS_DECISION ⚖️` | Quedan gaps de diseño | Te muestra cada uno con sus opciones y tradeoffs, y **espera tu respuesta** |
+| `ESCALATED ⚠️` | 2 iteraciones sin converger | Revisión humana |
+
+**El gate humano se mudó hacia arriba.** Un sub-agente no puede preguntar **ni esperar**: cuando JD
+devuelve el control su contexto se termina, no queda nada suspendido. Tu decisión no lo "despierta"
+— el orquestador te pregunta, rutea lo que decidiste, y **relanza JD** con un bloque
+`## Decisiones del Usuario`. Mismo resultado para vos, pero es una corrida nueva, no una espera.
+
+Y si JD corre **antes** de implementar (auto-trigger sobre `design.md` / `tasks.md`, sin código
+todavía), `jd-fixer` **ni se lanza**: cuando lo que estás juzgando ES el diseño, todo hallazgo es
+`DISENIO` por definición.
 
 ## Flujo SDD
 
@@ -170,6 +364,9 @@ producen código), `haiku` en init/explore/spec/tasks/archive (transformaciones 
 - **Nunca** buildear para "verificar". `dotnet test` en la fase verify sí.
 - Los sub-agentes **no pueden preguntarle nada al usuario**: registran supuestos en
   `## Assumptions & Open Questions` y el orquestador escala.
+- `sdd-verify` **no escribe fuera de `.atl/`** (hook `atl-only-guard.js`). Verificar es reportar,
+  no corregir: quien arregla lo que encontró es juez y parte, y borra la evidencia.
+- La config **no se commitea rota** (hook `precommit-validate.js`).
 
 ## Créditos
 

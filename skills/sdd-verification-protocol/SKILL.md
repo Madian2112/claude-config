@@ -103,8 +103,8 @@ leer 200 líneas de detalle.
 
 ## 7. Cuándo escalar a Judgment Day
 
-Podés lanzar el review adversarial (skill `judgment-day`) vos mismo — el spawn anidado está
-habilitado. Escalá cuando:
+Podés lanzar el review adversarial vos mismo con el tool `Agent` y `subagent_type: "judgment-day"`
+— el spawn anidado está habilitado (profundidad 3). Escalá cuando:
 
 - Encontrás 3+ CRITICAL: probablemente hay un problema de diseño, no de implementación.
 - El change toca auth, pagos, permisos o migraciones de datos **y** tenés al menos un WARNING.

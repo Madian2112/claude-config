@@ -12,6 +12,14 @@ effort: high
 color: green
 skills:
   - sdd-artifact-protocol
+# Registra el modelo REAL que Claude Code le asigno, leido del transcript. Sin esto solo
+# sabriamos el que declaramos nosotros aca abajo, que no prueba nada.
+hooks:
+  PostToolUse:
+    - hooks:
+        - type: command
+          command: "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/detect-subagent-model.js\""
+          timeout: 10
 ---
 
 # SDD Apply — Implementación de Código

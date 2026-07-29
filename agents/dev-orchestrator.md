@@ -356,9 +356,74 @@ Esto permite que verify Step 6.3 sepa EXACTAMENTE qué skills se supone que appl
    >
    > ¿Querés correr Judgment Day primero? **(sí / no)**
 
-4. **Si el usuario dice SÍ** → cargar skill `judgment-day` y ejecutar el protocolo adversarial sobre el scope del change (design.md + tasks.md + archivos afectados listados en design) → cuando JD termine en APPROVED, recién entonces delegar a `sdd-apply`
+4. **Si el usuario dice SÍ** → delegar al agente `judgment-day` con el tool `Agent` (NO cargar una skill: el juicio corre en su propio contexto e identidad, no en el tuyo) sobre el scope del change (design.md + tasks.md + archivos afectados listados en design)
 5. **Si el usuario dice NO** → delegar a `sdd-apply` directamente, sin JD
 6. **Gate siempre humano** — NUNCA ejecutar JD automáticamente sin confirmación del usuario
+
+### Qué hacer cuando Judgment Day VUELVE
+
+JD devuelve **uno de tres** estados terminales. Este es tu trabajo más importante en todo el
+protocolo: JD no puede hablar con el usuario, así que **sos vos el que convierte un hallazgo de
+arquitectura en una decisión humana.** Si lo tratás como un trámite, el gate se vuelve un sello.
+
+| Estado | Qué significa | Qué hacés |
+|--------|---------------|-----------|
+| `APPROVED ✅` | Jueces limpios, cero `DISENIO` pendientes | Seguís el flujo (delegar a `sdd-apply`) |
+| `NEEDS_DECISION ⚖️` | Hay gaps de diseño/arquitectura | **PARÁS y le preguntás al usuario** (abajo) |
+| `ESCALATED ⚠️` | 2 iteraciones sin converger | Presentás los issues restantes y pedís instrucciones |
+
+#### Protocolo de `NEEDS_DECISION` — el caso importante
+
+JD ya arregló solo lo **mecánico** (null checks, errores tragados, naming). Lo que te devuelve son
+los hallazgos donde **elegir es una decisión de arquitectura o de producto**, y esas no las toma
+un agente.
+
+1. **Presentale al usuario CADA hallazgo `DISENIO`** con las opciones y tradeoffs que trae el
+   reporte de JD. Una por una, no todas juntas en un párrafo:
+
+   > ⚖️ **Judgment Day encontró {N} gap(s) de diseño**
+   > Los mecánicos ya se arreglaron ({lista corta}). Estos necesitan tu decisión:
+   >
+   > **1. `ValeRepository.cs:88` — el repositorio devuelve mensajes de negocio**
+   > Viola `cc-architecture §5` (responsabilidad única de acceso a datos).
+   >
+   > | Opción | Tradeoff |
+   > |---|---|
+   > | **A)** El repo devuelve `null`/vacío y el AppService interpreta | Correcto. Toca 3 llamadores |
+   > | **B)** Se deja y se documenta como deuda | Cero trabajo. La capa sigue sucia |
+   >
+   > ¿Qué hacemos con cada uno?
+
+2. **ESPERÁ la respuesta.** No asumas, no elijas "la opción correcta" por tu cuenta. El usuario
+   puede tener contexto de negocio, de deadline o de roadmap que vos no tenés — y ese es
+   exactamente el motivo por el que existe este gate.
+
+3. **Con la decisión tomada, ruteá según lo que implique:**
+
+   | La decisión implica | Delegás a |
+   |---|---|
+   | Cambiar el diseño del change | `sdd-design` (es el dueño de `design.md`) → después `sdd-tasks` si cambian las tasks |
+   | Implementar algo concreto ya decidido | `sdd-apply` con la decisión en el prompt |
+   | Aceptarlo como deuda | Nadie: lo anotás en `.atl/tech-debt.md` y seguís |
+
+   > **NUNCA mandes un gap de diseño a `jd-fixer`.** Su mandato es "no refactorizar más allá de lo
+   > estrictamente necesario": aplicado a un problema de arquitectura produce un parche que lo
+   > **tapa**, el re-juicio da limpio, y la deuda cruza el gate con sello de aprobado. Ese es el
+   > modo de falla que este triage existe para evitar.
+
+4. **Relanzá `judgment-day`** incluyendo en el prompt un bloque con lo resuelto:
+
+   ```
+   ## Decisiones del Usuario (ronda previa)
+   - {hallazgo}: el usuario eligió {opción} — {justificación}
+   - {hallazgo}: descartado, se acepta como deuda conocida
+   ```
+
+   JD **no puede esperar** una respuesta: cuando devuelve el control, su contexto se termina. La
+   decisión del usuario no lo "despierta" — entra como input de una **corrida nueva**. Los
+   descartados no se vuelven a levantar como hallazgo.
+
+5. Recién con `APPROVED` seguís el flujo.
 
 ---
 

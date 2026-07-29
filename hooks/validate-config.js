@@ -11,11 +11,18 @@
  *
  * Comprueba:
  *   1. Frontmatter YAML presente y parseable en agents/ y skills/
- *   2. Todo `skills:` de un agente apunta a una skill que existe
- *   3. Toda skill nombrada en SKILL-REGISTRY.md tiene su carpeta
- *   4. Toda skill de stack esta en el registry (y al reves)
- *   5. Todo comando de hook en settings.json apunta a un archivo existente
- *   6. settings.json es JSON valido y no quedaron `model` invalidos en agentes
+ *   2. Toda clave de frontmatter existe en el schema de su tipo de archivo
+ *   3. Todo `skills:` de un agente apunta a una skill que existe
+ *   4. Toda skill nombrada en SKILL-REGISTRY.md tiene su carpeta
+ *   5. Toda skill de stack esta en el registry (y al reves)
+ *   6. Todo comando de hook en settings.json apunta a un archivo existente
+ *   7. settings.json es JSON valido y no quedaron `model` invalidos en agentes
+ *
+ * El punto 2 nacio de un bug real: skills/arch-review y skills/tdd declaraban `skills:` en su
+ * frontmatter creyendo que precargaban cc-solid & co. Ese campo NO existe en SKILL.md (es campo
+ * de SUB-AGENTE), asi que Claude Code lo ignoraba en silencio y las dos skills corrian sin una
+ * sola regla cargada. Un campo mal escrito no da error: simplemente no hace nada. Por eso se
+ * valida contra un schema cerrado y no contra una lista de campos prohibidos.
  *
  * Sale con codigo 1 si encuentra errores, 0 si esta todo bien.
  * Sin dependencias: parser de YAML minimo, suficiente para frontmatter plano.
@@ -69,6 +76,78 @@ function parseFm(raw) {
 const dirs = (p) =>
   fs.existsSync(p) ? fs.readdirSync(p, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name) : [];
 
+// ------------------------------------------------------- Schemas de frontmatter
+//
+// OJO CON EL CASING: no es un descuido de la doc, son dos schemas distintos.
+//   SKILL.md  -> kebab-case  (`disallowed-tools`, `argument-hint`)
+//   agents/*  -> camelCase   (`disallowedTools`, `permissionMode`, `maxTurns`)
+// Escribir uno con el casing del otro cae en el mismo pozo que el bug de `skills:`:
+// se ignora en silencio.
+//
+// Fuente: code.claude.com/docs/en/skills y /docs/en/sub-agents.
+
+const CLAVES_SKILL = new Set([
+  'name', 'description', 'when_to_use', 'argument-hint', 'arguments',
+  'disable-model-invocation', 'user-invocable', 'allowed-tools', 'disallowed-tools',
+  'model', 'effort', 'context', 'agent', 'background', 'hooks', 'paths', 'shell',
+  // Del estandar abierto Agent Skills (agentskills.io). Claude Code los ignora, no molestan.
+  'license', 'metadata',
+]);
+
+const CLAVES_AGENTE = new Set([
+  'name', 'description', 'tools', 'disallowedTools', 'model', 'permissionMode',
+  'maxTurns', 'skills', 'mcpServers', 'hooks', 'memory', 'background', 'effort',
+  'isolation', 'color', 'initialPrompt',
+  'license', 'metadata',
+]);
+
+// Errores de casing/parentesco frecuentes -> mensaje que dice QUE hacer, no solo que esta mal.
+const SUGERENCIAS = {
+  skills: 'no existe en SKILL.md (es campo de SUB-AGENTE). Una skill no puede precargar otras: ' +
+    'pedilas explicitamente en el body con el tool Skill, o usa `context: fork` + `agent:`',
+  'disallowed-tools': 'en un AGENTE el campo es camelCase: `disallowedTools`',
+  disallowedTools: 'en una SKILL el campo es kebab-case: `disallowed-tools`',
+  'allowed-tools': 'los agentes no filtran con `allowed-tools`: usa `tools:` (allowlist) o `disallowedTools:`',
+  tools: 'en una SKILL el campo es `allowed-tools` (pre-aprobacion), no `tools`',
+  color: 'no existe en SKILL.md — es campo de sub-agente',
+  paths: 'no existe en agents/ — es campo de SKILL.md',
+};
+
+// Valores validos de enums. Se declaran ACA arriba, antes del primer uso: son `const` a nivel
+// de modulo, y leerlos antes de su declaracion tira ReferenceError por TDZ.
+const MODELOS = ['haiku', 'sonnet', 'opus', 'fable', 'inherit'];
+const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+const COLORES = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'cyan'];
+
+/** Valida las claves de primer nivel contra el schema del tipo de archivo. */
+function validarClaves(etiqueta, fm, permitidas) {
+  for (const k of Object.keys(fm)) {
+    if (permitidas.has(k)) continue;
+    const extra = SUGERENCIAS[k] ? ` — ${SUGERENCIAS[k]}` : ' — no existe en el schema, se ignora en SILENCIO';
+    err(`${etiqueta}: frontmatter "${k}"${extra}`);
+  }
+}
+
+// Tools que un agente puede pedir. Un `tools:` con un nombre que no resuelve no es cosmetico:
+// segun la doc, si NINGUN entry resuelve, el sub-agente directamente NO ARRANCA. Y un typo
+// suelto ("Aget") le saca silenciosamente una capacidad que su prompt da por sentada.
+const TOOLS_CONOCIDOS = new Set([
+  'Read', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash', 'BashOutput', 'KillShell',
+  'Glob', 'Grep', 'Agent', 'Task', 'Skill', 'WebFetch', 'WebSearch', 'TodoWrite',
+  'AskUserQuestion', 'ExitPlanMode', 'SlashCommand', 'ListMcpResources', 'ReadMcpResource',
+]);
+
+// Nombres de agente declarados, para validar referencias cruzadas (skill -> agent).
+// Se arma ANTES que las skills porque el chequeo de `agent:` las necesita.
+const agentsDir = path.join(ROOT, 'agents');
+const nombresDeAgente = new Set();
+for (const f of fs.existsSync(agentsDir) ? fs.readdirSync(agentsDir).filter((x) => x.endsWith('.md')) : []) {
+  const raw = frontmatter(path.join(agentsDir, f));
+  if (raw === null) continue;
+  const n = parseFm(raw).name;
+  if (n) nombresDeAgente.add(n);
+}
+
 // ---------------------------------------------------------------- 1. Skills
 const skillsDir = path.join(ROOT, 'skills');
 const skills = new Set();
@@ -86,18 +165,28 @@ for (const nombre of dirs(skillsDir)) {
     continue;
   }
   const fm = parseFm(raw);
+  validarClaves(`skills/${nombre}`, fm, CLAVES_SKILL);
   if (!fm.description) warn(`skills/${nombre}: sin 'description' — Claude no sabe cuando activarla`);
   if (fm.name && fm.name !== nombre) {
     warn(`skills/${nombre}: el campo name es "${fm.name}" y no coincide con la carpeta`);
   }
+  if (fm.context && fm.context !== 'fork') {
+    err(`skills/${nombre}: context "${fm.context}" no es valido (el unico valor soportado es "fork")`);
+  }
+  if (fm.agent && fm.context !== 'fork') {
+    warn(`skills/${nombre}: declara 'agent' pero sin 'context: fork' — el campo no hace nada`);
+  }
+  // Una skill lanzadora que apunta a un agente inexistente falla en el momento de invocarla,
+  // que es siempre el peor momento.
+  if (fm.agent && !nombresDeAgente.has(fm.agent)) {
+    err(`skills/${nombre}: 'agent: ${fm.agent}' no existe en agents/ (nombres validos: ${[...nombresDeAgente].join(', ')})`);
+  }
+  if (fm.effort && !EFFORTS.includes(fm.effort)) {
+    err(`skills/${nombre}: effort "${fm.effort}" no es valido (${EFFORTS.join(', ')})`);
+  }
 }
 
 // ---------------------------------------------------------------- 2. Agentes
-const agentsDir = path.join(ROOT, 'agents');
-const MODELOS = ['haiku', 'sonnet', 'opus', 'fable', 'inherit'];
-const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
-const COLORES = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'cyan'];
-
 for (const f of fs.existsSync(agentsDir) ? fs.readdirSync(agentsDir).filter((x) => x.endsWith('.md')) : []) {
   const file = path.join(agentsDir, f);
   const raw = frontmatter(file);
@@ -106,6 +195,7 @@ for (const f of fs.existsSync(agentsDir) ? fs.readdirSync(agentsDir).filter((x) 
     continue;
   }
   const fm = parseFm(raw);
+  validarClaves(`agents/${f}`, fm, CLAVES_AGENTE);
 
   if (!fm.name) err(`agents/${f}: falta 'name' (obligatorio)`);
   if (!fm.description) err(`agents/${f}: falta 'description' (obligatorio)`);
@@ -121,6 +211,14 @@ for (const f of fs.existsSync(agentsDir) ? fs.readdirSync(agentsDir).filter((x) 
   // La razon #1 por la que un agente arranca roto: precargar una skill que ya no existe.
   for (const s of fm.skills || []) {
     if (!skills.has(s)) err(`agents/${f}: precarga la skill "${s}", que NO existe en skills/`);
+  }
+
+  // `tools` llega como string separado por comas: "Read, Edit, mcp__engram__*".
+  for (const t of String(fm.tools || '').split(',').map((x) => x.trim()).filter(Boolean)) {
+    if (t.startsWith('mcp__')) continue; // servers MCP: no los podemos resolver desde acá
+    if (!TOOLS_CONOCIDOS.has(t)) {
+      warn(`agents/${f}: tool "${t}" no esta en la lista de tools conocidos — revisá que no sea un typo`);
+    }
   }
 }
 
@@ -174,11 +272,23 @@ try {
 }
 
 // ------------------------------------------------------------- 5. Sintaxis JS
-for (const f of fs.readdirSync(path.join(ROOT, 'hooks')).filter((x) => x.endsWith('.js'))) {
+// Recursivo a proposito: hooks/lib/ tiene codigo COMPARTIDO por varios hooks, asi que un error
+// de sintaxis ahi los rompe todos a la vez. Es el archivo que menos se puede dar el lujo de
+// quedar sin chequear.
+function jsRecursivo(dir, rel = 'hooks') {
+  const salida = [];
+  for (const d of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (d.isDirectory()) salida.push(...jsRecursivo(path.join(dir, d.name), `${rel}/${d.name}`));
+    else if (d.name.endsWith('.js')) salida.push([path.join(dir, d.name), `${rel}/${d.name}`]);
+  }
+  return salida;
+}
+
+for (const [full, etiqueta] of jsRecursivo(path.join(ROOT, 'hooks'))) {
   try {
-    new (require('vm').Script)(fs.readFileSync(path.join(ROOT, 'hooks', f), 'utf8'), { filename: f });
+    new (require('vm').Script)(fs.readFileSync(full, 'utf8'), { filename: etiqueta });
   } catch (e) {
-    err(`hooks/${f}: error de sintaxis — ${e.message}`);
+    err(`${etiqueta}: error de sintaxis — ${e.message}`);
   }
 }
 
