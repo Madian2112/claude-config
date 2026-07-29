@@ -356,7 +356,7 @@ Esto permite que verify Step 6.3 sepa EXACTAMENTE qué skills se supone que appl
    >
    > ¿Querés correr Judgment Day primero? **(sí / no)**
 
-4. **Si el usuario dice SÍ** → cargar skill `judgment-day` y ejecutar el protocolo adversarial sobre el scope del change (design.md + tasks.md + archivos afectados listados en design) → cuando JD termine en APPROVED, recién entonces delegar a `sdd-apply`
+4. **Si el usuario dice SÍ** → delegar al agente `judgment-day` con el tool `Agent` (NO cargar una skill: el juicio corre en su propio contexto e identidad, no en el tuyo) sobre el scope del change (design.md + tasks.md + archivos afectados listados en design) → cuando JD termine en APPROVED, recién entonces delegar a `sdd-apply`
 5. **Si el usuario dice NO** → delegar a `sdd-apply` directamente, sin JD
 6. **Gate siempre humano** — NUNCA ejecutar JD automáticamente sin confirmación del usuario
 

@@ -117,7 +117,11 @@ Restricciones de plataforma, no de estilo. Aplican a todo lo que corra vía el t
   listado en `tools`). Ante ambigüedad: elegir la interpretación más conservadora, seguir, y
   registrarla en `## Assumptions & Open Questions` del artifact. El orquestador escala al usuario.
 - **NO pueden spawnear otros sub-agentes** salvo que `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` esté
-  seteado (acá está en `2`, para que `sdd-verify` pueda lanzar Judgment Day).
+  seteado. Acá está en **`3`**, y la cadena más larga es exactamente esa:
+  `sdd-verify` (1) → `judgment-day` (2) → `jd-judge` ∥ `jd-fixer` (3).
+  Era `2` cuando Judgment Day era una skill (se cargaba DENTRO de `sdd-verify`, sin gastar nivel).
+  Al volverse agente propio pasó a ocupar su propio nivel — que es el precio de tener identidad
+  y contexto separados.
 - Corriendo en **background** pierden varios tools nativos; conservan `Read`, `Grep`, `Glob`,
   `Bash`, `Edit`, `Write`, `Skill`, `WebFetch`, `WebSearch` y **todos** los MCP.
 

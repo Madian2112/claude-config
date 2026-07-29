@@ -209,6 +209,49 @@ La fase se **trunca en el primer paréntesis, guion o punto y coma** y se corta 
 se comía toda la barra. El detalle completo se lee donde corresponde: en `state.md` o con
 `/sdd-status`.
 
+## Judgment Day — por qué es un agente y no una skill
+
+```
+/judgment-day  ó  dev-orchestrator  ó  sdd-verify
+        │
+        ▼
+  judgment-day (coordina; SIN Edit ni Write)
+        │
+        ├──► jd-judge  ┐  en paralelo, ciegos, sin Edit/Write
+        ├──► jd-judge  ┘  ninguno sabe del otro
+        │
+        └──► jd-fixer     solo los hallazgos CONFIRMADOS por ambos
+```
+
+**Una skill no crea una identidad**: se carga en el contexto de quien la invoca. Cuando Judgment
+Day era skill y lo lanzaba `dev-orchestrator`, el "juez" **era** el orquestador con instrucciones
+nuevas — mismo contexto, misma persona, mismo color en la UI. Un review adversarial hecho por el
+mismo que orquesta el trabajo no es adversarial: es alguien revisándose a sí mismo.
+
+La separación de roles es **estructural**, no una promesa en prosa:
+
+| Agente | Rol | `Edit`/`Write` |
+|---|---|---|
+| `judgment-day` | Coordina. Nunca revisa ni arregla | ❌ No los tiene |
+| `jd-judge` (×2) | Encuentra problemas. Nunca aprueba ni arregla | ❌ No los tiene |
+| `jd-fixer` | Aplica solo los confirmados | ✅ Sí |
+
+Acá **sí** alcanza con acotar `tools:`, porque la restricción es sobre la herramienta. Compará con
+`sdd-verify`, donde es sobre el *destino* (necesita escribir su reporte) y hace falta un hook.
+
+`skills/judgment-day/SKILL.md` quedó como **lanzador** de 20 líneas con `context: fork` +
+`agent: judgment-day`: `/judgment-day` sigue funcionando, pero el protocolo vive en un solo lugar
+y corre en contexto propio.
+
+> **Costo del cambio: un nivel de anidamiento.** `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` pasó de
+> `2` a `3`, porque la cadena más larga es `sdd-verify` (1) → `judgment-day` (2) → jueces (3).
+> Como skill, JD se cargaba *dentro* de `sdd-verify` sin gastar nivel. Tener identidad propia se
+> paga con profundidad.
+
+**El gate humano se mudó hacia arriba.** Un sub-agente no puede preguntarle nada al usuario, así
+que JD ya no pregunta "¿seguimos iterando?": tras 2 iteraciones devuelve `ESCALATED` con la
+pregunta formulada, y quien lo llamó (`dev-orchestrator`, que sí habla con vos) decide.
+
 ## Flujo SDD
 
 ```

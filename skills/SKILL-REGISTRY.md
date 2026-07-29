@@ -251,7 +251,8 @@ sub-agente como `## Project Standards (auto-resolved)`.
 - Migración generada = migración revisada; el SQL también cumple `sql-standards` (`VARCHAR`, constraints con nombre)
 
 ### judgment-day
-- SIEMPRE lanzar DOS jueces en PARALELO (nunca secuencial) — vía el tool `Agent`
+- Es un LANZADOR: el protocolo vive en el agente `judgment-day` (`agents/judgment-day.md`)
+- SIEMPRE lanzar DOS jueces `jd-judge` en PARALELO (nunca secuencial) — vía el tool `Agent`
 - Los jueces NO se conocen entre sí (review ciego e independiente)
 - El orquestador NO hace el review — solo coordina y sintetiza veredictos
 - Inyectar las mismas Project Standards en ambos jueces + en el Fix Agent

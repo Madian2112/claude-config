@@ -7,7 +7,7 @@
   "enableAllProjectMcpServers": true,
 
   "env": {
-    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "2"
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "3"
   },
 
   "extraKnownMarketplaces": {

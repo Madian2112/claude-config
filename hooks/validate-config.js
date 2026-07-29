@@ -128,6 +128,26 @@ function validarClaves(etiqueta, fm, permitidas) {
   }
 }
 
+// Tools que un agente puede pedir. Un `tools:` con un nombre que no resuelve no es cosmetico:
+// segun la doc, si NINGUN entry resuelve, el sub-agente directamente NO ARRANCA. Y un typo
+// suelto ("Aget") le saca silenciosamente una capacidad que su prompt da por sentada.
+const TOOLS_CONOCIDOS = new Set([
+  'Read', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash', 'BashOutput', 'KillShell',
+  'Glob', 'Grep', 'Agent', 'Task', 'Skill', 'WebFetch', 'WebSearch', 'TodoWrite',
+  'AskUserQuestion', 'ExitPlanMode', 'SlashCommand', 'ListMcpResources', 'ReadMcpResource',
+]);
+
+// Nombres de agente declarados, para validar referencias cruzadas (skill -> agent).
+// Se arma ANTES que las skills porque el chequeo de `agent:` las necesita.
+const agentsDir = path.join(ROOT, 'agents');
+const nombresDeAgente = new Set();
+for (const f of fs.existsSync(agentsDir) ? fs.readdirSync(agentsDir).filter((x) => x.endsWith('.md')) : []) {
+  const raw = frontmatter(path.join(agentsDir, f));
+  if (raw === null) continue;
+  const n = parseFm(raw).name;
+  if (n) nombresDeAgente.add(n);
+}
+
 // ---------------------------------------------------------------- 1. Skills
 const skillsDir = path.join(ROOT, 'skills');
 const skills = new Set();
@@ -156,14 +176,17 @@ for (const nombre of dirs(skillsDir)) {
   if (fm.agent && fm.context !== 'fork') {
     warn(`skills/${nombre}: declara 'agent' pero sin 'context: fork' — el campo no hace nada`);
   }
+  // Una skill lanzadora que apunta a un agente inexistente falla en el momento de invocarla,
+  // que es siempre el peor momento.
+  if (fm.agent && !nombresDeAgente.has(fm.agent)) {
+    err(`skills/${nombre}: 'agent: ${fm.agent}' no existe en agents/ (nombres validos: ${[...nombresDeAgente].join(', ')})`);
+  }
   if (fm.effort && !EFFORTS.includes(fm.effort)) {
     err(`skills/${nombre}: effort "${fm.effort}" no es valido (${EFFORTS.join(', ')})`);
   }
 }
 
 // ---------------------------------------------------------------- 2. Agentes
-const agentsDir = path.join(ROOT, 'agents');
-
 for (const f of fs.existsSync(agentsDir) ? fs.readdirSync(agentsDir).filter((x) => x.endsWith('.md')) : []) {
   const file = path.join(agentsDir, f);
   const raw = frontmatter(file);
@@ -188,6 +211,14 @@ for (const f of fs.existsSync(agentsDir) ? fs.readdirSync(agentsDir).filter((x) 
   // La razon #1 por la que un agente arranca roto: precargar una skill que ya no existe.
   for (const s of fm.skills || []) {
     if (!skills.has(s)) err(`agents/${f}: precarga la skill "${s}", que NO existe en skills/`);
+  }
+
+  // `tools` llega como string separado por comas: "Read, Edit, mcp__engram__*".
+  for (const t of String(fm.tools || '').split(',').map((x) => x.trim()).filter(Boolean)) {
+    if (t.startsWith('mcp__')) continue; // servers MCP: no los podemos resolver desde acá
+    if (!TOOLS_CONOCIDOS.has(t)) {
+      warn(`agents/${f}: tool "${t}" no esta en la lista de tools conocidos — revisá que no sea un typo`);
+    }
   }
 }
 
