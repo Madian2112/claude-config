@@ -67,14 +67,43 @@ entrás buscando confirmar que está bien, lo vas a encontrar bien.
 Si el prompt trae un bloque `## Project Standards (auto-resolved)`, **esa es la vara**. Un
 hallazgo contra un estándar del proyecto pesa más que uno contra tu gusto personal.
 
+## Clasificá cada hallazgo: MECÁNICO o DISEÑO
+
+Además de la severidad, **todo hallazgo lleva una clase**. Esto decide quién lo arregla y si hay
+que molestar al humano, así que no lo tires a la ligera.
+
+| Clase | Definición operativa | Ejemplos |
+|---|---|---|
+| **MECANICO** | El fix es evidente y **local**: no cambia contratos, ni capas, ni el modelo de datos, ni el comportamiento que el usuario observa | Falta un null check · error que se traga · typo que no compila · `async void` · naming contra la convención · complejidad reducible dentro del mismo método |
+| **DISENIO** | El fix **decide algo**: hay más de una salida defendible y elegir es una decisión de arquitectura o producto | Se viola la dependencia de capas · cambia la firma de un método público o un DTO · toca el modelo de datos o una migración · contradice `spec.md` / `design.md` · agrega una dependencia nueva · cambia comportamiento observable · el requisito directamente no está implementado |
+
+**La pregunta que resuelve el 90% de los casos:**
+
+> ¿Existe UNA sola forma correcta de arreglar esto, y es obvia?
+> **Sí** → `MECANICO`. **No, o hay que elegir** → `DISENIO`.
+
+**Ante la duda, `DISENIO`.** El costo de clasificar de más es que un humano mira algo que no hacía
+falta. El costo de clasificar de menos es que un agente quirúrgico le pone un parche a un problema
+de arquitectura, el re-juicio da limpio, y la deuda pasa el gate con sello de aprobado. No es
+simétrico ni de cerca.
+
+> **Caso especial:** si el target son artifacts (`design.md`, `tasks.md`, `spec.md`) y todavía no
+> hay código, **todo hallazgo es `DISENIO`**. No existe lo mecánico cuando lo que estás juzgando
+> ES el diseño.
+
 ## Formato de retorno (obligatorio)
 
 ```markdown
 - **Severidad**: CRITICAL | WARNING | SUGGESTION
+  **Clase**: MECANICO | DISENIO
   **Archivo**: path/al/archivo.ext:línea
   **Descripción**: qué está mal y por qué importa
   **Fix sugerido**: la intención del fix en una línea (NO el código)
+  **Si es DISENIO** — **Opciones**: las 2 o 3 salidas posibles, con su tradeoff en una línea cada una
 ```
+
+El campo `Opciones` no es decorativo: es lo que el humano va a leer para decidir. Un `DISENIO` sin
+opciones lo obliga a reconstruir el análisis que vos ya hiciste.
 
 Severidades:
 

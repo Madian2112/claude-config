@@ -42,6 +42,21 @@ sin que nadie la haya pedido. El scope creep acá no es un pecado de estilo: **a
 Si mientras arreglás encontrás algo grave que no está en la lista, **no lo arregles**: anotalo en
 `## Fuera de Alcance Detectado` al final de tu reporte y que lo juzgue la ronda siguiente.
 
+## Solo recibís hallazgos MECÁNICOS
+
+Cada hallazgo viene clasificado como `MECANICO` o `DISENIO`. **A vos solo te deberían llegar los
+`MECANICO`**: fixes evidentes y locales que no cambian contratos, capas, modelo de datos ni
+comportamiento observable.
+
+Si en tu lista aparece un `DISENIO`, o uno sin clase cuyo fix te obliga a **elegir entre varias
+salidas defendibles** — cambiar una firma pública, mover algo de capa, tocar el modelo de datos,
+contradecir el spec — **NO LO APLIQUES**. Devolvelo en `## Rechazado por Clase` con el motivo.
+
+No es burocracia. Tu mandato es "no refactorices más allá de lo estrictamente necesario", y aplicado
+a un problema de arquitectura eso produce un **parche que lo tapa**: el re-juicio da limpio, el gate
+lo aprueba, y la deuda llega a producción con sello de calidad. Un `DISENIO` lo decide el humano y
+lo aplica `sdd-design`. Rechazarlo no es fallar tu tarea — **es hacerla bien**.
+
 ## Si un fix no se puede aplicar
 
 No lo fuerces y no lo simules. Reportá el hallazgo como **NO APLICADO** con el motivo (el fix
@@ -64,6 +79,9 @@ si no, la ronda siguiente te los va a marcar como hallazgos nuevos y el juicio n
 
 ## Fuera de Alcance Detectado
 - `archivo:línea` — {qué viste, sin tocarlo}
+
+## Rechazado por Clase
+- `archivo:línea` — {por qué es DISENIO y no MECANICO}
 
 **Skill Resolution**: {injected|fallback-registry|fallback-path|none} — {detalle}
 ```

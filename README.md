@@ -248,9 +248,39 @@ y corre en contexto propio.
 > Como skill, JD se cargaba *dentro* de `sdd-verify` sin gastar nivel. Tener identidad propia se
 > paga con profundidad.
 
-**El gate humano se mudó hacia arriba.** Un sub-agente no puede preguntarle nada al usuario, así
-que JD ya no pregunta "¿seguimos iterando?": tras 2 iteraciones devuelve `ESCALATED` con la
-pregunta formulada, y quien lo llamó (`dev-orchestrator`, que sí habla con vos) decide.
+### Triage: qué se arregla solo y qué te pregunta
+
+Cada hallazgo confirmado por los dos jueces lleva una **clase**, y esa clase decide el camino:
+
+| Clase | Qué es | Quién lo aplica |
+|---|---|---|
+| `MECANICO` | El fix es evidente y **local**: null check, error tragado, typo, naming, complejidad dentro del método | `jd-fixer`, en el acto. No te molesta |
+| `DISENIO` | El fix **decide algo**: viola capas, cambia una firma o un DTO, toca el modelo de datos, contradice el spec | **Vos**, vía orquestador. JD no lo toca |
+
+Clasifican **los dos jueces por separado**. Si discrepan en la clase, **gana `DISENIO`**.
+
+> **Por qué un gap de arquitectura NUNCA va al fixer.** El mandato de `jd-fixer` es *"no
+> refactorices más allá de lo estrictamente necesario"*. Aplicado a un problema de diseño produce
+> un parche mínimo que lo **tapa**: el re-juicio da limpio, el gate aprueba, y la deuda llega a
+> producción con sello de calidad. Un cambio de diseño lo hace `sdd-design`, que es el dueño de
+> `design.md`.
+
+Por eso hay **tres** estados terminales, y `NEEDS_DECISION` gana sobre `APPROVED`:
+
+| Estado | Cuándo | Qué hace el orquestador |
+|---|---|---|
+| `APPROVED ✅` | Jueces limpios **y** cero `DISENIO` | Sigue el flujo |
+| `NEEDS_DECISION ⚖️` | Quedan gaps de diseño | Te muestra cada uno con sus opciones y tradeoffs, y **espera tu respuesta** |
+| `ESCALATED ⚠️` | 2 iteraciones sin converger | Revisión humana |
+
+**El gate humano se mudó hacia arriba.** Un sub-agente no puede preguntar **ni esperar**: cuando JD
+devuelve el control su contexto se termina, no queda nada suspendido. Tu decisión no lo "despierta"
+— el orquestador te pregunta, rutea lo que decidiste, y **relanza JD** con un bloque
+`## Decisiones del Usuario`. Mismo resultado para vos, pero es una corrida nueva, no una espera.
+
+Y si JD corre **antes** de implementar (auto-trigger sobre `design.md` / `tasks.md`, sin código
+todavía), `jd-fixer` **ni se lanza**: cuando lo que estás juzgando ES el diseño, todo hallazgo es
+`DISENIO` por definición.
 
 ## Flujo SDD
 
