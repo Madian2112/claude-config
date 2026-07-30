@@ -56,3 +56,6 @@ plugins/plugin-catalog-cache.json
 # Estado de maquina: contiene installLocation con ruta absoluta (C:\Users\<user>\...).
 # La fuente de verdad portable es `extraKnownMarketplaces` en settings.json.
 plugins/known_marketplaces.json
+
+# Imagenes
+image-cache/

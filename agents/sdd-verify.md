@@ -7,7 +7,7 @@ description: >
   Aplica cc-complexity + cc-naming para detectar violaciones de estándares.
 tools: Read, Edit, Write, Bash, Grep, Glob, Agent, Skill, mcp__engram__*
 model: sonnet
-effort: high
+effort: medium
 color: red
 skills:
   - sdd-verification-protocol
