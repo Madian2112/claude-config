@@ -312,6 +312,7 @@ El orquestador usa esta tabla para decidir qué compact rules inyectar en cada s
 | Async code review | `csharp-concurrency-patterns` |
 | Crear PR / preparar branch | `branch-pr` |
 | Review adversarial / "judgment day" | `judgment-day` (+ las skills del stack del target) |
+| Auditar un formulario web contra la API | `form-audit` (+ `angular-interceptors-auth` si hay loop de refresh) |
 
 > Skills de proyecto (ej. un `angular-new-feature` propio de un repo Angular puntual) se agregan
 > acá como filas nuevas cuando corresponda — viven en `.claude/skills/` a nivel de ESE proyecto,

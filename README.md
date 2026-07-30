@@ -432,6 +432,7 @@ producen código), `haiku` en init/explore/spec/tasks/archive (transformaciones 
 | `/arch-review` | Auditoría de Clean Architecture del diff actual |
 | `/workshop-material` | Material de taller a partir de las skills |
 | `/tdd` | Ciclo estricto red-green-refactor |
+| `/form-audit` | Audita un formulario contra la API real: contrato, respuestas rotas provocadas con mocks, loops y `[object Object]` |
 
 ## Cosas que NO son negociables
 
