@@ -88,7 +88,9 @@ agents/                   dev-orchestrator + los 9 sub-agentes del flujo SDD
 skills/                   Ecosistema de skills (stack, metodología e invocables)
   SKILL-REGISTRY.md       Cheat-sheet humano + compact rules de las skills de STACK
 hooks/                    Enforcement en Node.js
-mcp/engram.json           Definición reproducible del MCP server
+mcp/                      Definiciones reproducibles de los MCP servers
+  engram.json             Memoria persistente
+  playwright.json         Navegador real para probar formularios contra una API
 settings.json             Modelo, permisos, hooks, statusline
 ```
 
@@ -102,6 +104,7 @@ settings.json             Modelo, permisos, hooks, statusline
 | `atl-only-guard.js` | PreToolUse — scoped a 8 sub-agentes | **Bloquea** escrituras fuera de `.atl/`. Enganchado por el campo `hooks:` del frontmatter, no global. Lo llevan todas las fases SDD **menos `sdd-apply`**, que es la única que escribe código de proyecto |
 | `detect-subagent-model.js` | PostToolUse — scoped a los sub-agentes | Lee del transcript el modelo **real** que la plataforma asignó y lo compara con el declarado |
 | `auto-format.js` | PostToolUse (Edit·MultiEdit·Write) | `dotnet format` / `prettier` sobre el archivo tocado. No compila |
+| `session-title.js` | SessionStart | Nombra la sesión (`change→fase` o la rama) para que `/resume` muestre un título y no un pedazo de conversación |
 | `session-bootstrap.js` | SessionStart | Cleanup de `agent-outputs` (TTL 24h) y de marcas de cierre (TTL 7d), inyecta changes SDD abiertos, avisa si Engram no está |
 | `post-compact-memory.js` | SessionStart (`compact`) | Inyecta el protocolo AFTER COMPACTION de Engram apenas se compacta el contexto |
 | `session-close-guard.js` | Stop | Bloquea **una vez por sesión** si hubo escrituras y no se llamó a `mem_session_summary` |
@@ -109,6 +112,84 @@ settings.json             Modelo, permisos, hooks, statusline
 | `subagent-index.js` | SubagentStop | Cierra la ficha, calcula duración, traza en `_index.jsonl` y **devuelve una línea al orquestador** |
 | `statusline.js` | statusLine | `proyecto · ‹sesión› · rama* · [modelo] · SDD:change→fase` — el segmento SDD **solo** aparece bajo `dev-orchestrator` (ver abajo) |
 | `validate-config.js` | manual | Valida la consistencia de toda la config — ver abajo |
+
+## MCP: Playwright — probar formularios contra una API real
+
+`@playwright/mcp` (Microsoft) le da al agente un navegador de verdad. **No trabaja con píxeles**:
+usa el árbol de accesibilidad, así que no hace falta un modelo de visión y las acciones son
+determinísticas.
+
+Está para tres cosas que el navegador ve y un test unitario no:
+
+| Qué querés detectar | Con qué |
+|---|---|
+| Que la respuesta de la API sea la correcta | `browser_network_requests` (con `filter` regexp tipo `/api/.*`) → `browser_network_request` devuelve **headers y body** completos |
+| Un loop infinito por una respuesta no contemplada | `browser_network_requests` filtrado: el mismo endpoint repetido N veces **es** la evidencia |
+| Un `[object Object]` en el mensaje de éxito/error | `browser_snapshot`: como es el árbol de accesibilidad y no una foto, el texto roto aparece **literal** |
+
+Y la pieza que lo vuelve un test y no una observación: **`browser_route` mockea respuestas**
+(`pattern`, `status`, `body`, `contentType`). Podés **provocar** la respuesta rara —un 500 con un
+body que la app no contempla— en vez de esperar a que ocurra. Se limpia con `browser_unroute`.
+
+### Por qué MCP y no el CLI
+
+El propio README de Playwright recomienda **CLI+SKILLS** para coding agents, por costo de tokens, y
+reserva el MCP para *"exploratory automation... long-running autonomous workflows where maintaining
+continuous browser context outweighs token cost concerns"*. Este caso es ese: el navegador tiene
+que quedar **vivo** entre el submit del form, la lectura de la respuesta y la inspección del DOM.
+Con el CLI, cada invocación arranca de cero.
+
+### Permisos: no está auto-aprobado todo
+
+De las ~50 tools, 27 quedan pre-aprobadas (navegar, llenar forms, leer red y consola, mockear).
+Piden permiso las que tocan estado real o ejecutan código: `browser_evaluate`, `browser_file_upload`,
+y todo lo de cookies/localStorage.
+
+**`browser_run_code_unsafe` está en `deny`.** Su propia descripción dice: *"executes arbitrary
+JavaScript in the Playwright server process and is **RCE-equivalent**"*. No hay caso de uso de
+testeo de formularios que lo necesite.
+
+> Del README, textual: **"Playwright MCP is *not* a security boundary"**, y `--allowed-origins`
+> *"does not serve as a security boundary and does not affect redirects"*. No lo apuntes a un
+> entorno con datos productivos.
+
+Corre con `--isolated` (perfil en memoria: cada corrida arranca sin sesión ni cookies viejas) y
+**headed** a propósito — para debuggear un form conviene ver el navegador. Agregale `--headless`
+si lo vas a correr en CI.
+
+### Activarlo: clonar el repo NO alcanza
+
+`mcp/playwright.json` es la **declaración** versionada, no el registro. El registro real vive en
+`.claude.json`, que está en `.gitignore` porque tiene tokens — exactamente el mismo caso que
+Engram. En una máquina nueva hay que registrarlo a mano, una sola vez:
+
+```bash
+claude mcp add --scope user playwright -- npx @playwright/mcp@latest --isolated --caps=devtools
+claude mcp list                                    # confirmar que aparece
+```
+
+Requisitos: **Node 18+** (ya lo tenés). El navegador lo baja `npx` la primera vez que se lanza,
+así que **el primer uso tarda** — no es que se colgó. Si querés adelantarlo:
+`npx playwright install chrome`.
+
+Después: la app **corriendo** (la levantás vos, no el agente), y `/form-audit <URL>`.
+
+### Quién tiene acceso al MCP (ojo con esto)
+
+Registrar el server **no** se lo da a todos. El campo `tools:` de un agente es una **allowlist**:
+la doc dice que un sub-agente *"inherits every tool available to subagents **if omitted**"* — o sea
+que en cuanto lo declarás, lo que no está, no existe.
+
+| Sesión | ¿Ve Playwright? | Por qué |
+|---|---|---|
+| `claude` (sin agente) | ✅ | El hilo principal no filtra tools |
+| `claude --agent=dev-orchestrator` | ✅ | Tiene `mcp__playwright__*` en su `tools:` |
+| Sub-agentes `sdd-*` y `jd-*` | ❌ | Su `tools:` no lo lista, y es a propósito: ninguno navega |
+
+> Esto se descubrió probando el flujo real. `dev-orchestrator` declaraba solo `mcp__engram__*`, así
+> que bajo `--agent=dev-orchestrator` las tools de Playwright **no existían** — sin error, igual que
+> el `skills:` inválido y el `delegate()`. Si algún día querés auditar formularios dentro de la fase
+> `verify`, hay que agregarle `mcp__playwright__*` a `agents/sdd-verify.md`; hoy no lo tiene.
 
 ## Validar la configuración
 
@@ -253,6 +334,35 @@ Las fichas viven en `session-state/agent-runs/` (no versionado). Si un sub-agent
 sucia, `SubagentStop` nunca corre y la ficha queda huérfana: se descartan las de más de 2h al
 leerlas y `session-bootstrap` las barre al arrancar. Mejor mostrar de menos que mentir.
 
+### Por qué `/resume` mostraba un pedazo de conversación
+
+El picker de `/resume` **no se puede customizar**: es UI interna, no hay setting ni hook que dibuje
+esa lista. Lo que sí tiene es una cadena de fallback, textual de la doc:
+
+> *"Each row shows the **session name if you set one**, otherwise the AI-generated session title,
+> conversation summary, **or first prompt**"*
+
+Cuando en la lista ves conversación en vez de un título, es porque cayó hasta el **último eslabón**.
+No se arregla cambiando el picker — se arregla llenando el **primero**. Eso hace
+`session-title.js`, emitiendo `hookSpecificOutput.sessionTitle` con el mismo dato que la statusline
+muestra como `‹sesión›`, así las dos vistas coinciden:
+
+| Situación | Título |
+|---|---|
+| Hay un change SDD abierto | `alta-vales→design` |
+| Hay una rama de feature | `12345-alta-vales` (sin el prefijo `feat/`) |
+| Sesión suelta sobre `master` | **Ninguno, a propósito** |
+
+**No pisa dos cosas, y es deliberado:**
+
+1. **Un nombre puesto por vos** (`--name`, `/rename`, `Ctrl+R` en el picker). Llega como
+   `session_title` en el input; si viene, el hook no toca nada.
+2. **El título autogenerado por IA, cuando va a ser mejor.** Claude Code resume tu primer prompt
+   con un modelo rápido, y ese resumen suele ser más informativo que un nombre de rama. Pero el
+   hook corre **antes** del primer prompt: no tiene con qué competir. Por eso solo nombra cuando
+   tiene algo genuinamente mejor —un change SDD o una rama de feature—. Ponerle `master` a todo
+   sería peor que el problema original.
+
 El segmento `‹sesión›` sale de `session_name`, que **no siempre viene**: aparece solo si nombraste
 la sesión con `--name` o `/rename`, o una vez que existe un título autogenerado. El nombre por
 defecto (tipo `my-app-3f`) NO lo popula, así que el segmento simplemente se omite. Se trunca a
@@ -356,6 +466,7 @@ producen código), `haiku` en init/explore/spec/tasks/archive (transformaciones 
 | `/arch-review` | Auditoría de Clean Architecture del diff actual |
 | `/workshop-material` | Material de taller a partir de las skills |
 | `/tdd` | Ciclo estricto red-green-refactor |
+| `/form-audit` | Audita un formulario contra la API real: contrato, respuestas rotas provocadas con mocks, loops y `[object Object]` |
 
 ## Cosas que NO son negociables
 

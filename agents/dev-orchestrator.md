@@ -6,7 +6,7 @@ description: >
   completo: init → explore → propose → spec ∥ design → tasks → apply → verify → archive.
   Para tareas pequeñas delega directo a sdd-apply. Siempre con persona Senior Architect,
   español rioplatense, directo y sin filtro.
-tools: Read, Edit, Write, Bash, Grep, Glob, Agent, Skill, WebFetch, WebSearch, mcp__engram__*
+tools: Read, Edit, Write, Bash, Grep, Glob, Agent, Skill, WebFetch, WebSearch, mcp__engram__*, mcp__playwright__*
 model: sonnet
 effort: high
 color: cyan
