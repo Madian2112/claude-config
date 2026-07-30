@@ -37,6 +37,8 @@ invocación. Los sub-agentes `sdd-*` NO leen este registry — reciben las regla
 | Revisión código existente, deuda técnica, code smells, Long Method, God Class, Primitive Obsession, refactorizar C# | csharp-refactoring | `~/.claude/skills/csharp-refactoring/SKILL.md` |
 | Domain Service, DomainService, validar lógica de negocio, lógica pura sin I/O, coordinación entre entidades o DTOs, validación cruzada, cuándo crear un domain service | cc-domain-services | `~/.claude/skills/cc-domain-services/SKILL.md` |
 | XSS, CSRF, CSP, OWASP, tokens JWT, cookies httpOnly, Core Web Vitals, skeleton screens, optimistic UI, seguridad frontend | frontend-security-performance | `~/.claude/skills/frontend-security-performance/SKILL.md` |
+| Crear/modificar formulario, validación de inputs, mensajes de error, labels, wizard multi-paso, accesibilidad de forms (WCAG) — agnóstico de framework | ux-forms | `~/.claude/skills/ux-forms/SKILL.md` |
+| Armar formulario desde cero, validación duplicada cliente/servidor, componente Field reusable, schema-first, autosave/draft, debounce en validación async — agnóstico de framework | ux-forms-velocity | `~/.claude/skills/ux-forms-velocity/SKILL.md` |
 | Tipos complejos TypeScript, ReturnType, generics, utility types, as const, type guards, satisfies, discriminated unions | typescript-advanced | `~/.claude/skills/typescript-advanced/SKILL.md` |
 | Endpoint nuevo, JWT del lado servidor, authorization policy, IDOR, SQL injection, mass assignment, secretos, manejo de excepciones en API | dotnet-api-security | `~/.claude/skills/dotnet-api-security/SKILL.md` |
 | Repositorio, query LINQ, EF Core, Dapper, N+1, AsNoTracking, paginado, migraciones, performance de consultas | efcore-data-access | `~/.claude/skills/efcore-data-access/SKILL.md` |
@@ -207,6 +209,25 @@ sub-agente como `## Project Standards (auto-resolved)`.
 - Optimistic UI: actualizar UI antes de confirmar con servidor, revertir en `catch` — solo acciones no críticas
 - LCP: atributo `priority` en imagen principal; reservar espacio con `aspect-ratio` para evitar CLS
 
+### ux-forms
+- Validación: `on blur` por default, `on change` solo para feedback positivo, `on submit` para validación cruzada/servidor — NUNCA marcar error en un campo que el usuario todavía no tocó
+- Label SIEMPRE visible y asociado programáticamente al input — placeholder es solo ejemplo de formato, nunca reemplazo del label
+- Error específico y ubicado junto al campo, nunca solo por color — acompañar con `aria-invalid` + `aria-describedby`
+- Al fallar el submit, mover el foco al primer campo con error
+- `autocomplete` con token correcto (`email`, `given-name`, `tel`, etc.) — requisito WCAG 1.3.5
+- Campos relacionados agrupados en `fieldset`/`legend` o equivalente semántico; bloques de 5-7 campos (Ley de Miller)
+- Botón de submit: deshabilitado + loading DURANTE el submit, siempre, sin excepción — previene doble submit
+- Wizard multi-paso: mostrar progreso, persistir datos de pasos previos, validar cada paso antes de avanzar
+- Mobile: `type`/`inputmode` correcto para teclado nativo, una sola columna de campos
+
+### ux-forms-velocity
+- Schema-first: UN schema declarativo por formulario (reglas + mensajes) como única fuente de verdad — nunca validación repetida en template + componente + backend sin schema compartido
+- Componente `Field` genérico config-driven en vez de un componente por campo — señal de que hace falta: tercer campo copy-pasteado con el mismo boilerplate
+- Catálogo de estados obligatorio por formulario: `idle` / `validating` / `submitting` / `success` / `error` / `disabled` — nunca colapsar todo a un boolean `hasError`
+- Autosave/draft solo en formularios largos o con costo real de perder progreso — nunca en datos sensibles (pagos, contraseñas)
+- Validación async (username/email disponible) SIEMPRE con debounce (300-500ms) + cancelación de la validación anterior si el valor cambió
+- Mensajes de error en catálogo central (constantes o claves i18n), nunca strings hardcodeados repetidos por campo
+
 ### typescript-advanced
 - `as const` para constantes literales e inmutables — preferir sobre enums para strings de configuración
 - `ReturnType<typeof fn>` para inferir tipos de retorno — evita duplicar interfaces
@@ -305,6 +326,8 @@ El orquestador usa esta tabla para decidir qué compact rules inyectar en cada s
 | Refactor / deuda técnica C# | `csharp-refactoring` + `cc-complexity` + `cc-solid` + `cc-naming` |
 | Angular auth / interceptors | `angular-interceptors-auth` + `angular-core` + `frontend-security-performance` |
 | Seguridad frontend / performance Angular | `frontend-security-performance` + `angular-core` + `angular-performance` |
+| Crear/mejorar formulario (cualquier stack frontend) | `ux-forms` + `ux-forms-velocity` (+ skill de stack si aplica: `angular-core`, `typescript-advanced`, etc.) |
+| `sdd-apply` (frontend Angular con formularios) | `angular-core` + `typescript-advanced` + `ux-forms` + `ux-forms-velocity` |
 | TypeScript avanzado / tipado | `typescript-advanced` + `angular-core` |
 | New API endpoint | `cc-architecture` + `cc-solid` + `cc-naming` + `cc-domain-services` + `dotnet-api-security` |
 | Repositorio / query / performance de datos | `efcore-data-access` + `sql-standards` + `cc-architecture` |
