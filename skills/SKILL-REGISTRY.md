@@ -63,6 +63,7 @@ No se auto-cargan (`disable-model-invocation: true`) — las disparás vos.
 | `/arch-review` | Auditoría de Clean Architecture sobre el diff actual, con severidades y regla violada |
 | `/workshop-material` | Material de taller a partir de las skills del ecosistema |
 | `/tdd` | Ciclo estricto red-green-refactor con gates (verifica primero que haya harness de tests) |
+| `/form-audit` | Audita un formulario web contra la API real con Playwright MCP: contrato de la respuesta, 9 respuestas rotas provocadas con mocks, loops infinitos y `[object Object]` |
 
 ## User Skills — Foundation (Workflow / Meta)
 
@@ -261,6 +262,18 @@ sub-agente como `## Project Standards (auto-resolved)`.
 - Un gap de arquitectura NUNCA va al fixer: lo parchea y la deuda cruza el gate como aprobada
 - Máximo 2 iteraciones (review → fix → re-review) — escalá si no convergen
 - Útil cuando el costo de un bug en prod > costo de dos rondas de review
+
+### form-audit
+- Requiere el MCP `playwright` registrado y la app **ya corriendo** — el agente NO la levanta
+- Cruzar SIEMPRE tres fuentes: request enviado, body real de la respuesta, y snapshot renderizado.
+  El bug vive en el DESACUERDO entre la respuesta y lo que se muestra, no en ninguna por separado
+- Las respuestas rotas se PROVOCAN con `browser_route` (status + body + contentType), no se esperan
+- `browser_unroute` después de CADA escenario: un route colgado hace mentir al siguiente caso
+- Loops: `browser_network_requests` con `filter` — el mismo endpoint repetido N veces ES la evidencia
+- Strings que delatan en el snapshot: `[object Object]`, `[object Promise]`, `undefined`, `null`, `NaN`
+- Loop de refresh en 401 → cargar `angular-interceptors-auth`, ahí está el patrón de corte
+- Snapshots y listas de red son verbosos: usar el parámetro `filename` y grepear, no volcar al contexto
+- Se reporta, NO se arregla. Un hallazgo sin repro exacto no es un hallazgo
 
 ### cc-domain-services
 - Crear DomainService cuando la lógica de validación/coordinación no pertenece naturalmente a ninguna entidad y no requiere I/O

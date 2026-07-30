@@ -157,6 +157,23 @@ Corre con `--isolated` (perfil en memoria: cada corrida arranca sin sesión ni c
 **headed** a propósito — para debuggear un form conviene ver el navegador. Agregale `--headless`
 si lo vas a correr en CI.
 
+### Activarlo: clonar el repo NO alcanza
+
+`mcp/playwright.json` es la **declaración** versionada, no el registro. El registro real vive en
+`.claude.json`, que está en `.gitignore` porque tiene tokens — exactamente el mismo caso que
+Engram. En una máquina nueva hay que registrarlo a mano, una sola vez:
+
+```bash
+claude mcp add --scope user playwright -- npx @playwright/mcp@latest --isolated --caps=devtools
+claude mcp list                                    # confirmar que aparece
+```
+
+Requisitos: **Node 18+** (ya lo tenés). El navegador lo baja `npx` la primera vez que se lanza,
+así que **el primer uso tarda** — no es que se colgó. Si querés adelantarlo:
+`npx playwright install chrome`.
+
+Después: la app **corriendo** (la levantás vos, no el agente), y `/form-audit <URL>`.
+
 ## Validar la configuración
 
 ```bash
