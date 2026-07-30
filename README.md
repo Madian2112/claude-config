@@ -174,6 +174,23 @@ así que **el primer uso tarda** — no es que se colgó. Si querés adelantarlo
 
 Después: la app **corriendo** (la levantás vos, no el agente), y `/form-audit <URL>`.
 
+### Quién tiene acceso al MCP (ojo con esto)
+
+Registrar el server **no** se lo da a todos. El campo `tools:` de un agente es una **allowlist**:
+la doc dice que un sub-agente *"inherits every tool available to subagents **if omitted**"* — o sea
+que en cuanto lo declarás, lo que no está, no existe.
+
+| Sesión | ¿Ve Playwright? | Por qué |
+|---|---|---|
+| `claude` (sin agente) | ✅ | El hilo principal no filtra tools |
+| `claude --agent=dev-orchestrator` | ✅ | Tiene `mcp__playwright__*` en su `tools:` |
+| Sub-agentes `sdd-*` y `jd-*` | ❌ | Su `tools:` no lo lista, y es a propósito: ninguno navega |
+
+> Esto se descubrió probando el flujo real. `dev-orchestrator` declaraba solo `mcp__engram__*`, así
+> que bajo `--agent=dev-orchestrator` las tools de Playwright **no existían** — sin error, igual que
+> el `skills:` inválido y el `delegate()`. Si algún día querés auditar formularios dentro de la fase
+> `verify`, hay que agregarle `mcp__playwright__*` a `agents/sdd-verify.md`; hoy no lo tiene.
+
 ## Validar la configuración
 
 ```bash
