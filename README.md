@@ -88,7 +88,9 @@ agents/                   dev-orchestrator + los 9 sub-agentes del flujo SDD
 skills/                   Ecosistema de skills (stack, metodología e invocables)
   SKILL-REGISTRY.md       Cheat-sheet humano + compact rules de las skills de STACK
 hooks/                    Enforcement en Node.js
-mcp/engram.json           Definición reproducible del MCP server
+mcp/                      Definiciones reproducibles de los MCP servers
+  engram.json             Memoria persistente
+  playwright.json         Navegador real para probar formularios contra una API
 settings.json             Modelo, permisos, hooks, statusline
 ```
 
@@ -110,6 +112,50 @@ settings.json             Modelo, permisos, hooks, statusline
 | `subagent-index.js` | SubagentStop | Cierra la ficha, calcula duración, traza en `_index.jsonl` y **devuelve una línea al orquestador** |
 | `statusline.js` | statusLine | `proyecto · ‹sesión› · rama* · [modelo] · SDD:change→fase` — el segmento SDD **solo** aparece bajo `dev-orchestrator` (ver abajo) |
 | `validate-config.js` | manual | Valida la consistencia de toda la config — ver abajo |
+
+## MCP: Playwright — probar formularios contra una API real
+
+`@playwright/mcp` (Microsoft) le da al agente un navegador de verdad. **No trabaja con píxeles**:
+usa el árbol de accesibilidad, así que no hace falta un modelo de visión y las acciones son
+determinísticas.
+
+Está para tres cosas que el navegador ve y un test unitario no:
+
+| Qué querés detectar | Con qué |
+|---|---|
+| Que la respuesta de la API sea la correcta | `browser_network_requests` (con `filter` regexp tipo `/api/.*`) → `browser_network_request` devuelve **headers y body** completos |
+| Un loop infinito por una respuesta no contemplada | `browser_network_requests` filtrado: el mismo endpoint repetido N veces **es** la evidencia |
+| Un `[object Object]` en el mensaje de éxito/error | `browser_snapshot`: como es el árbol de accesibilidad y no una foto, el texto roto aparece **literal** |
+
+Y la pieza que lo vuelve un test y no una observación: **`browser_route` mockea respuestas**
+(`pattern`, `status`, `body`, `contentType`). Podés **provocar** la respuesta rara —un 500 con un
+body que la app no contempla— en vez de esperar a que ocurra. Se limpia con `browser_unroute`.
+
+### Por qué MCP y no el CLI
+
+El propio README de Playwright recomienda **CLI+SKILLS** para coding agents, por costo de tokens, y
+reserva el MCP para *"exploratory automation... long-running autonomous workflows where maintaining
+continuous browser context outweighs token cost concerns"*. Este caso es ese: el navegador tiene
+que quedar **vivo** entre el submit del form, la lectura de la respuesta y la inspección del DOM.
+Con el CLI, cada invocación arranca de cero.
+
+### Permisos: no está auto-aprobado todo
+
+De las ~50 tools, 27 quedan pre-aprobadas (navegar, llenar forms, leer red y consola, mockear).
+Piden permiso las que tocan estado real o ejecutan código: `browser_evaluate`, `browser_file_upload`,
+y todo lo de cookies/localStorage.
+
+**`browser_run_code_unsafe` está en `deny`.** Su propia descripción dice: *"executes arbitrary
+JavaScript in the Playwright server process and is **RCE-equivalent**"*. No hay caso de uso de
+testeo de formularios que lo necesite.
+
+> Del README, textual: **"Playwright MCP is *not* a security boundary"**, y `--allowed-origins`
+> *"does not serve as a security boundary and does not affect redirects"*. No lo apuntes a un
+> entorno con datos productivos.
+
+Corre con `--isolated` (perfil en memoria: cada corrida arranca sin sesión ni cookies viejas) y
+**headed** a propósito — para debuggear un form conviene ver el navegador. Agregale `--headless`
+si lo vas a correr en CI.
 
 ## Validar la configuración
 
