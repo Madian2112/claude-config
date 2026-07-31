@@ -6,7 +6,7 @@ description: >
   con justificación), produce la tabla de archivos a crear/modificar/eliminar y diagramas
   de secuencia para flujos complejos. Aplica cc-architecture + cc-solid + cc-complexity.
 tools: Read, Edit, Write, Bash, Grep, Glob, mcp__engram__*
-model: sonnet
+model: opus
 effort: medium
 color: orange
 skills:
