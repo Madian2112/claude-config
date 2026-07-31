@@ -156,18 +156,6 @@
         ]
       }
     ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/session-title.js\"",
-            "timeout": 10,
-            "statusMessage": "Refrescando titulo de sesion..."
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "Edit|MultiEdit|Write",

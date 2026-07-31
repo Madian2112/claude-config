@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * SessionStart + UserPromptSubmit — Le pone nombre a la sesion para que `/resume` muestre algo
- * util, y lo mantiene fresco mientras la sesion avanza.
+ * SessionStart — Le pone nombre a la sesion para que `/resume` muestre algo util.
  *
  * EL PROBLEMA:
  * El picker de `/resume` no se puede customizar: es UI interna de Claude Code, no hay setting
@@ -14,15 +13,15 @@
  * ULTIMO eslabon. No se arregla cambiando el picker — se arregla llenando el PRIMERO.
  *
  * QUE HACE:
- * Emite `sessionTitle` con el mismo dato que la statusline muestra como ‹sesion›, asi las dos
- * vistas dicen lo mismo: el change SDD abierto con su fase, o la rama de trabajo.
+ * Emite `sessionTitle` con la rama de trabajo, para que `/resume` muestre algo util en vez de un
+ * pedazo de conversacion.
  *
- * POR QUE TAMBIEN CORRE EN UserPromptSubmit (v2.1.101+, confirmado en el changelog oficial:
- * "UserPromptSubmit hooks can set the session title via hookSpecificOutput.sessionTitle"):
- * SessionStart solo dispara al abrir/resumir/compactar. En una sesion larga el change SDD activo
- * puede avanzar de fase varias veces SIN que ninguno de esos eventos ocurra, y el titulo de arriba
- * quedaba pegado a la fase de cuando arranco la sesion — desincronizado del `SDD:` de la statusline,
- * que si se recalcula en cada render. Repetir el mismo calculo en cada prompt lo mantiene al dia.
+ * DELIBERADAMENTE NO incluye la fase SDD (change→fase). La continuidad entre sesiones de un mismo
+ * feature ya la da Engram (mem_context) + los archivos `.atl/changes/` cuando arrancas con
+ * dev-orchestrator — el titulo de sesion no necesita repetirla, y en una sesion SIN el orquestador
+ * ese dato no aporta nada. La statusline (`SDD:{change}→{fase}` en la barra de abajo) es harina de
+ * otro costal: esa es una vista EN VIVO mientras laburas bajo dev-orchestrator, no un mecanismo de
+ * continuidad entre sesiones, y sigue mostrandolo sin cambios.
  *
  * DOS COSAS QUE NO PISA, Y ES DELIBERADO:
  *
@@ -31,25 +30,15 @@
  *
  * 2. El titulo autogenerado por IA, cuando ese titulo va a ser MEJOR. Claude Code escribe un
  *    resumen de tu primer prompt con un modelo rapido, y ese resumen suele ser mas informativo
- *    que un nombre de rama. Pero en SessionStart corremos ANTES del primer prompt: no tenemos con
- *    que competir. Por eso solo ponemos nombre cuando tenemos algo genuinamente mejor —un change
- *    SDD abierto o una rama de feature—, y en una sesion suelta sobre master nos callamos la boca.
- *    Ponerle "master" a todo seria peor que el problema que vinimos a resolver.
- *
- * OJO — riesgo asumido a proposito: no hay confirmacion oficial de que `session_title` llegue
- * poblado en el payload de UserPromptSubmit igual que en SessionStart (la doc no lo detalla). Si
- * en la practica NO llega, el punto 1 de arriba deja de protegerse en este evento y un `/rename`
- * manual podria pisarse en el proximo mensaje. Probar: renombrar la sesion y mandar un mensaje;
- * si el nombre puesto a mano no sobrevive, sacar este hook de `UserPromptSubmit` en settings.json
- * y dejarlo solo en `SessionStart`.
+ *    que un nombre de rama. Pero nosotros corremos ANTES del primer prompt: no tenemos con que
+ *    competir. Por eso solo ponemos nombre cuando tenemos algo genuinamente mejor —una rama de
+ *    feature—, y en una sesion suelta sobre master nos callamos la boca. Ponerle "master" a todo
+ *    seria peor que el problema que vinimos a resolver.
  */
 
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const { spawnSync } = require('child_process');
-const { faseValida } = require('./lib/agent-meta');
 
 const MAX = 40;
 const RAMAS_SIN_VALOR = /^(master|main|develop|dev|trunk|HEAD)$/i;
@@ -58,11 +47,8 @@ const CHUNKS = [];
 process.stdin.on('data', (c) => CHUNKS.push(c));
 process.stdin.on('end', () => {
   let titulo = '';
-  let evento = 'SessionStart';
   try {
-    const payload = JSON.parse(Buffer.concat(CHUNKS).toString('utf8') || '{}');
-    evento = payload.hook_event_name || evento;
-    titulo = main(payload);
+    titulo = main(JSON.parse(Buffer.concat(CHUNKS).toString('utf8') || '{}'));
   } catch {
     /* nunca frenamos la sesion por el titulo */
   }
@@ -70,7 +56,7 @@ process.stdin.on('end', () => {
   if (titulo) {
     process.stdout.write(
       JSON.stringify({
-        hookSpecificOutput: { hookEventName: evento, sessionTitle: titulo },
+        hookSpecificOutput: { hookEventName: 'SessionStart', sessionTitle: titulo },
       })
     );
   }
@@ -78,29 +64,6 @@ process.stdin.on('end', () => {
 });
 
 const corto = (s) => (s.length > MAX ? s.slice(0, MAX - 1) + '…' : s);
-
-/** Change SDD abierto mas reciente: `{change}→{fase}`. Mismo criterio que la statusline. */
-function changeSdd(cwd) {
-  try {
-    const changesDir = path.join(cwd, '.atl', 'changes');
-    let mejor = null;
-    for (const name of fs.readdirSync(changesDir)) {
-      const st = path.join(changesDir, name, 'state.md');
-      if (!fs.existsSync(st)) continue;
-      const m = fs.readFileSync(st, 'utf8').match(/##\s*Current Phase\s*\r?\n+\s*([^\r\n]+)/i);
-      // state.md a veces trae prosa despues del token ("verify (completado — ...)").
-      const fase = (m ? m[1] : '').trim().split(/[(\-–—;,]/)[0].trim();
-      // Si no es uno de los 9 tokens del protocolo (sdd-artifact-protocol), el state.md esta
-      // corrupto o a medio escribir: mejor no mostrarlo que mostrar texto libre/markdown crudo.
-      if (!faseValida(fase) || /^closed$/i.test(fase)) continue;
-      const mtime = fs.statSync(st).mtimeMs;
-      if (!mejor || mtime > mejor.mtime) mejor = { name, fase, mtime };
-    }
-    return mejor ? `${mejor.name}→${mejor.fase}` : '';
-  } catch {
-    return '';
-  }
-}
 
 /** Rama de trabajo, sin el prefijo de tipo: "feat/12345-alta-vales" -> "12345-alta-vales". */
 function rama(cwd) {
@@ -120,5 +83,5 @@ function main(p) {
   if (p.session_title) return '';
 
   const cwd = p.cwd || process.cwd();
-  return corto(changeSdd(cwd) || rama(cwd) || '');
+  return corto(rama(cwd) || '');
 }

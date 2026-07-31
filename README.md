@@ -104,7 +104,7 @@ settings.json             Modelo, permisos, hooks, statusline
 | `atl-only-guard.js` | PreToolUse — scoped a 8 sub-agentes | **Bloquea** escrituras fuera de `.atl/`. Enganchado por el campo `hooks:` del frontmatter, no global. Lo llevan todas las fases SDD **menos `sdd-apply`**, que es la única que escribe código de proyecto |
 | `detect-subagent-model.js` | PostToolUse — scoped a los sub-agentes | Lee del transcript el modelo **real** que la plataforma asignó y lo compara con el declarado |
 | `auto-format.js` | PostToolUse (Edit·MultiEdit·Write) | `dotnet format` / `prettier` sobre el archivo tocado. No compila |
-| `session-title.js` | SessionStart | Nombra la sesión (`change→fase` o la rama) para que `/resume` muestre un título y no un pedazo de conversación |
+| `session-title.js` | SessionStart | Nombra la sesión (la rama de trabajo) para que `/resume` muestre un título y no un pedazo de conversación |
 | `session-bootstrap.js` | SessionStart | Cleanup de `agent-outputs` (TTL 24h) y de marcas de cierre (TTL 7d), inyecta changes SDD abiertos, avisa si Engram no está |
 | `post-compact-memory.js` | SessionStart (`compact`) | Inyecta el protocolo AFTER COMPACTION de Engram apenas se compacta el contexto |
 | `session-close-guard.js` | Stop | Bloquea **una vez por sesión** si hubo escrituras y no se llamó a `mem_session_summary` |
@@ -344,14 +344,19 @@ esa lista. Lo que sí tiene es una cadena de fallback, textual de la doc:
 
 Cuando en la lista ves conversación en vez de un título, es porque cayó hasta el **último eslabón**.
 No se arregla cambiando el picker — se arregla llenando el **primero**. Eso hace
-`session-title.js`, emitiendo `hookSpecificOutput.sessionTitle` con el mismo dato que la statusline
-muestra como `‹sesión›`, así las dos vistas coinciden:
+`session-title.js`, emitiendo `hookSpecificOutput.sessionTitle`:
 
 | Situación | Título |
 |---|---|
-| Hay un change SDD abierto | `alta-vales→design` |
 | Hay una rama de feature | `12345-alta-vales` (sin el prefijo `feat/`) |
 | Sesión suelta sobre `master` | **Ninguno, a propósito** |
+
+**Deliberadamente NO incluye la fase SDD** (`change→fase`, la que sí muestra la statusline como
+`SDD:...`). La continuidad entre sesiones de un mismo feature ya la da Engram (`mem_context`) + los
+archivos `.atl/changes/` al arrancar con `dev-orchestrator` — el título de sesión no necesita
+repetirla, y en una sesión sin el orquestador ese dato es ruido. La statusline es una vista **en
+vivo** mientras trabajás bajo `dev-orchestrator`, no un mecanismo de continuidad entre sesiones:
+por eso conserva la fase y el título no.
 
 **No pisa dos cosas, y es deliberado:**
 
@@ -360,8 +365,8 @@ muestra como `‹sesión›`, así las dos vistas coinciden:
 2. **El título autogenerado por IA, cuando va a ser mejor.** Claude Code resume tu primer prompt
    con un modelo rápido, y ese resumen suele ser más informativo que un nombre de rama. Pero el
    hook corre **antes** del primer prompt: no tiene con qué competir. Por eso solo nombra cuando
-   tiene algo genuinamente mejor —un change SDD o una rama de feature—. Ponerle `master` a todo
-   sería peor que el problema original.
+   tiene algo genuinamente mejor —una rama de feature—. Ponerle `master` a todo sería peor que el
+   problema original.
 
 El segmento `‹sesión›` sale de `session_name`, que **no siempre viene**: aparece solo si nombraste
 la sesión con `--name` o `/rename`, o una vez que existe un título autogenerado. El nombre por
