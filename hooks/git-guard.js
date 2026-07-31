@@ -7,10 +7,49 @@
  * "producto" ES la config.
  *
  * Esta regla vivia solo en prosa dentro de dev-orchestrator.md. Ahora es codigo.
+ *
+ * COMO DETECTAMOS EL REPO DE CONFIG (y por que NO por nombre de carpeta):
+ * Una version anterior matcheaba el cwd contra los literales ".claude" / "claude-config" por
+ * SUFIJO de path. Barato, pero le daba la exencion a CUALQUIER repo de proyecto que un cliente
+ * nombrara igual (ej. alguien clona este mismo repo con otro fin, o un proyecto vive en una
+ * carpeta ".claude"): la "regla absoluta" quedaba burlada por un nombre de carpeta, exactamente
+ * el error que `precommit-validate.js` ya evita comparando contra el TOPLEVEL real de git.
+ *
+ * Ahora hacemos lo mismo aca, pero solo cuando hace falta: `git rev-parse --show-toplevel` es un
+ * spawn por comando, y este hook corre en CADA Bash. Filtramos primero por el comando riesgoso
+ * (regex, gratis) y recien si matchea pagamos el spawn — que es exactamente el puñado de casos
+ * donde la exencion importa.
  */
 
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+const { spawnSync } = require('child_process');
+
+const configDir = process.env.CLAUDE_CONFIG_DIR || path.resolve(__dirname, '..');
+
+/** Normaliza para comparar rutas entre Git Bash (/c/Users/...) y Windows (C:\Users\...). */
+function norm(p) {
+  try {
+    return fs.realpathSync(p).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  } catch {
+    return String(p).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  }
+}
+
+/** ¿El cwd cae dentro del repo de configuracion? Contra el toplevel real, no contra el nombre. */
+function esRepoDeConfig(cwd) {
+  const r = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+    cwd,
+    encoding: 'utf8',
+    timeout: 5000,
+    shell: process.platform === 'win32',
+  });
+  if (r.status !== 0) return false;
+  const top = norm((r.stdout || '').trim());
+  return !!top && top === norm(configDir);
+}
 
 const CHUNKS = [];
 process.stdin.on('data', (c) => CHUNKS.push(c));
@@ -26,19 +65,11 @@ function main(payload) {
   const cmd = (payload.tool_input && payload.tool_input.command) || '';
   if (!cmd.trim()) process.exit(0);
 
-  const cwd = (payload.cwd || process.cwd()).replace(/\\/g, '/').toLowerCase();
-
-  // El repo de configuracion queda exento (ahi si trabajamos con git normalmente).
-  //
-  // OJO con comparar contra os.homedir(): en Windows devuelve "C:\Users\areyes" mientras que
-  // Git Bash reporta el cwd como "/c/Users/areyes". Comparar prefijos falla en silencio y el
-  // guard termina bloqueando el propio repo de config. Por eso matcheamos por SUFIJO de ruta,
-  // que es estable en los dos estilos.
-  const isConfigRepo = /(^|\/)\.claude(\/|$)/.test(cwd) || /(^|\/)claude-config(\/|$)/.test(cwd);
-  if (isConfigRepo) process.exit(0);
-
   const match = cmd.match(/\bgit\s+(commit|push|merge|rebase|cherry-pick)\b/);
   if (!match) process.exit(0);
+
+  const cwd = payload.cwd || process.cwd();
+  if (esRepoDeConfig(cwd)) process.exit(0);
 
   process.stdout.write(
     JSON.stringify({
