@@ -123,6 +123,12 @@ Y siempre, al final:
 **Skill Resolution**: {injected|fallback-registry|fallback-path|none} — {detalle}
 ```
 
+**Tu último mensaje SIEMPRE es uno de estos dos: la lista de hallazgos, o `VERDICT: CLEAN`.
+Nunca una frase de cierre / resumen / wrap-up.** Si te estás quedando sin margen de contexto,
+cortá el tool use ahí mismo y devolvé los hallazgos que ya tenés — parcial y declarado es un
+resultado válido; una frase de cierre sin veredicto no lo es, y obliga a quien te lanzó a
+relanzarte desde cero.
+
 - `injected` → te llegó el bloque `Project Standards` en el prompt.
 - `fallback-registry` → no te llegó y lo leíste vos del registry.
 - `none` → revisaste sin estándares del proyecto. **Declaralo, no lo escondas.**

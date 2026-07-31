@@ -91,6 +91,12 @@ Ambos jueces reciben el **mismo prompt, palabra por palabra**. Ninguno sabe del 
 contás que hay un segundo juez, contaminás el experimento y perdés el único dato que importa
 —la coincidencia independiente—.
 
+**Checkpoint antes de esperar nada**: confirmá que efectivamente mandaste DOS llamadas `Agent`
+con `subagent_type: "jd-judge"`, cada una con su propio `agent_id`. Si por lo que sea —falla de
+tool, límite de cuota, lo que sea— solo salió una, **no sigas**: lanzá la que falta antes de
+esperar ninguna notificación. Un juicio con un solo juez no es adversarial, es una opinión; no
+uses la tabla de acuerdo del Paso 2.a con un solo lado.
+
 ### Prompt del juez (idéntico para A y B)
 
 ```
@@ -165,6 +171,47 @@ Esperá a que **los dos** terminen. Un veredicto parcial no es un veredicto.
 Los sospechosos se reportan pero **no se arreglan solos**: un hallazgo que un solo juez vio es,
 por definición, el caso donde el acuerdo independiente falló.
 
+### Cuando un juez no entrega — recuperación acotada
+
+Dos formas distintas de que un juez "no entregue", y las dos se recuperan igual:
+
+**A) Veredicto inválido.** El agente terminó (`status: completed`) pero el mensaje final no es ni
+`VERDICT: CLEAN` ni una lista de hallazgos con Severidad/Clase/Archivo/Descripción/Fix, ni cierra
+con `**Skill Resolution**`. Señales de que en realidad no hizo trabajo real: casi sin tool calls de
+lectura, output de pocos tokens, ningún artifact escrito. Tratalo como si no hubiera terminado —
+una respuesta vacía con `status: completed` NO es un veredicto.
+
+**B) Falla de infraestructura.** El lanzamiento o el relanzamiento falla explícitamente por límite
+de cuota/rate limit de la API, o el agente muere sin producir nada.
+
+**La única recuperación válida para cualquiera de los dos casos: relanzar un juez FRESCO con el
+prompt COMPLETO original — nunca con solo un ID, nunca intentando "resumir" o "recuperar" la
+sesión anterior.** Un sub-agente no tiene `SendMessage` para retomar a otro que lanzó como
+hermano; pasarle solo un ID a un `Agent` nuevo produce un agente en frío, sin instrucciones, que
+no va a producir nada usable — es tokens tirados. Descartá esa sesión fallida explícitamente y no
+cuentes su notificación como resultado de nada.
+
+**Tope: UN solo reintento por juez.** Si el segundo intento también vuelve inválido o vuelve a
+fallar por cuota, NO hay un tercer intento. Cerrá con:
+
+```markdown
+### JUDGMENT: ESCALATED ⚠️ — infraestructura
+
+No se pudo obtener un veredicto usable de {Juez A|Juez B} después de 2 intentos.
+Motivo del fallo: {límite de cuota / veredicto vacío sin trabajo real / lo que corresponda}.
+No hay revisión adversarial válida sobre este target — NO declares APPROVED ni NEEDS_DECISION
+basándote en el juez que sí respondió; un solo juez no es Judgment Day.
+
+**PARA EL ORQUESTADOR**: no relances Judgment Day de nuevo en esta misma sesión — si la causa
+fue cuota, insistir ahora solo repite el fallo. Reintentar más tarde (la cuota se resetea) o
+pedir revisión manual.
+```
+
+**Mientras esperás las notificaciones reales**: una que no trae el resultado del juez que estás
+esperando (ID que no coincide, contenido genérico del hook sin veredicto) se reconoce en una
+línea o directamente en silencio operativo — no repitas el contexto completo cada vez que llegue
+una de estas. Cada repetición completa es una llamada que no aporta nada nuevo.
+
 ### 2.b — Triage de clase: quién puede arreglar qué
 
 Cada confirmado viene clasificado por los jueces como `MECANICO` o `DISENIO`. **Esa clase decide
@@ -214,7 +261,7 @@ Nunca termines sin uno de estos. Y el orden importa: **`NEEDS_DECISION` gana sob
 |---|---|---|
 | `APPROVED ✅` | Los dos jueces limpios **y** cero `DISENIO` pendientes | Sigue el flujo |
 | `NEEDS_DECISION ⚖️` | Quedan confirmados de clase `DISENIO` | Le pregunta al humano y te vuelve a lanzar con la decisión |
-| `ESCALATED ⚠️` | 2 iteraciones de fix mecánico sin converger | Revisión humana del código |
+| `ESCALATED ⚠️` | 2 iteraciones de fix mecánico sin converger, **o** 2 intentos fallidos de conseguir un juez que entregue (cuota/veredicto inválido) | Revisión humana del código |
 
 **Nunca declares `APPROVED` si hay un `DISENIO` sin resolver, por más que los mecánicos estén
 todos arreglados y los jueces vuelvan limpios de lo suyo.** Ese es el error que convierte este
