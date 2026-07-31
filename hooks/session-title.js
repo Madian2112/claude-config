@@ -13,8 +13,15 @@
  * ULTIMO eslabon. No se arregla cambiando el picker — se arregla llenando el PRIMERO.
  *
  * QUE HACE:
- * Emite `sessionTitle` con el mismo dato que la statusline muestra como ‹sesion›, asi las dos
- * vistas dicen lo mismo: el change SDD abierto con su fase, o la rama de trabajo.
+ * Emite `sessionTitle` con la rama de trabajo, para que `/resume` muestre algo util en vez de un
+ * pedazo de conversacion.
+ *
+ * DELIBERADAMENTE NO incluye la fase SDD (change→fase). La continuidad entre sesiones de un mismo
+ * feature ya la da Engram (mem_context) + los archivos `.atl/changes/` cuando arrancas con
+ * dev-orchestrator — el titulo de sesion no necesita repetirla, y en una sesion SIN el orquestador
+ * ese dato no aporta nada. La statusline (`SDD:{change}→{fase}` en la barra de abajo) es harina de
+ * otro costal: esa es una vista EN VIVO mientras laburas bajo dev-orchestrator, no un mecanismo de
+ * continuidad entre sesiones, y sigue mostrandolo sin cambios.
  *
  * DOS COSAS QUE NO PISA, Y ES DELIBERADO:
  *
@@ -24,15 +31,13 @@
  * 2. El titulo autogenerado por IA, cuando ese titulo va a ser MEJOR. Claude Code escribe un
  *    resumen de tu primer prompt con un modelo rapido, y ese resumen suele ser mas informativo
  *    que un nombre de rama. Pero nosotros corremos ANTES del primer prompt: no tenemos con que
- *    competir. Por eso solo ponemos nombre cuando tenemos algo genuinamente mejor —un change SDD
- *    abierto o una rama de feature—, y en una sesion suelta sobre master nos callamos la boca.
- *    Ponerle "master" a todo seria peor que el problema que vinimos a resolver.
+ *    competir. Por eso solo ponemos nombre cuando tenemos algo genuinamente mejor —una rama de
+ *    feature—, y en una sesion suelta sobre master nos callamos la boca. Ponerle "master" a todo
+ *    seria peor que el problema que vinimos a resolver.
  */
 
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const { spawnSync } = require('child_process');
 
 const MAX = 40;
@@ -60,27 +65,6 @@ process.stdin.on('end', () => {
 
 const corto = (s) => (s.length > MAX ? s.slice(0, MAX - 1) + '…' : s);
 
-/** Change SDD abierto mas reciente: `{change}→{fase}`. Mismo criterio que la statusline. */
-function changeSdd(cwd) {
-  try {
-    const changesDir = path.join(cwd, '.atl', 'changes');
-    let mejor = null;
-    for (const name of fs.readdirSync(changesDir)) {
-      const st = path.join(changesDir, name, 'state.md');
-      if (!fs.existsSync(st)) continue;
-      const m = fs.readFileSync(st, 'utf8').match(/##\s*Current Phase\s*\r?\n+\s*([^\r\n]+)/i);
-      // state.md a veces trae prosa despues del token ("verify (completado — ...)").
-      const fase = (m ? m[1] : '').trim().split(/[(\-–—;,]/)[0].trim();
-      if (!fase || /^closed$/i.test(fase)) continue;
-      const mtime = fs.statSync(st).mtimeMs;
-      if (!mejor || mtime > mejor.mtime) mejor = { name, fase, mtime };
-    }
-    return mejor ? `${mejor.name}→${mejor.fase}` : '';
-  } catch {
-    return '';
-  }
-}
-
 /** Rama de trabajo, sin el prefijo de tipo: "feat/12345-alta-vales" -> "12345-alta-vales". */
 function rama(cwd) {
   const r = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
@@ -99,5 +83,5 @@ function main(p) {
   if (p.session_title) return '';
 
   const cwd = p.cwd || process.cwd();
-  return corto(changeSdd(cwd) || rama(cwd) || '');
+  return corto(rama(cwd) || '');
 }

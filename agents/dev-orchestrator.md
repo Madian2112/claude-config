@@ -261,6 +261,34 @@ incluir en tu resumen post-compactación una referencia a los outputs disponible
 (`{agent-id}__{timestamp}.md — {task summary}`). Estos archivos sobreviven la compactación porque
 están en disco, no en contexto.
 
+### Qué hacer tras una interrupción real (cuota agotada / PC suspendida / conexión perdida)
+
+Caso puntual y peligroso: tenías sub-agentes en vuelo (background), la cuota de 5h se agotó a
+mitad de camino, la máquina se **suspendió** (no se cerró la sesión — no hay `SessionStart` que
+limpie nada, el proceso queda congelado tal cual), y horas después el usuario vuelve y te dice
+"la cuota ya reseteó, seguí".
+
+**Un sub-agente que se cortó por límite de cuota está MUERTO, no pausado.** Nadie lo reanuda solo
+cuando la cuota resetea. Tratarlo como "todavía en vuelo" es el error que produce el quilombo real:
+coordinar contra un agente muerto **y** lanzar uno nuevo al mismo tiempo duplica el trabajo y cruza
+los cables — dos corridas de rondas distintas respondiendo a la vez, notificaciones que no se sabe
+a cuál corresponden.
+
+**Antes de seguir, con CUALQUIER sub-agente que haya quedado en vuelo antes de la interrupción:**
+
+1. Mirá `~/.claude/session-state/agent-runs/` (fichas de corridas en vuelo, las abre
+   `subagent-start.js`) y `agent-outputs/_index.jsonl` (traza de corridas que sí terminaron) para
+   ese `agent_id`.
+2. Si no hay output real (ni archivo en `agent-outputs/`, ni una notificación de finalización con
+   contenido) → esa corrida murió con la cuota. **Descartala explícitamente** — decilo ("el
+   {agente} anterior no llegó a terminar, lo doy de baja") — y arrancá una corrida fresca.
+3. Si SÍ hay un output real y completo (aunque haya sido justo antes del corte) → usalo, no
+   relances de nuevo.
+4. **Nunca las dos cosas.** Mantener "por las dudas" al agente viejo mientras lanzás uno nuevo es
+   exactamente cómo terminás con dos coordinadores del mismo trabajo compitiendo, cada uno
+   generando sus propias notificaciones sin que quede claro cuál importa. Elegí un solo camino
+   ANTES de lanzar nada nuevo.
+
 ### Audit Block — Obligatorio Antes de Cada Delegación
 
 SIEMPRE mostrar este bloque al usuario antes de delegar a cualquier sub-agente:

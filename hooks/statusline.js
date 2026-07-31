@@ -20,7 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { RUNS_DIR, etiqueta, discrepa } = require('./lib/agent-meta');
+const { RUNS_DIR, etiqueta, discrepa, faseValida } = require('./lib/agent-meta');
 
 
 /** Rama + dirty con cache en disco por cwd (TTL 5s). Ante cualquier problema, devuelve null. */
@@ -225,7 +225,9 @@ process.stdin.on('end', () => {
           .split(/[(\-–—;,]/)[0]
           .trim()
           .slice(0, 24);
-        if (!fase || /^closed$/i.test(fase)) continue;
+        // Si no es uno de los 9 tokens del protocolo (sdd-artifact-protocol), el state.md esta
+        // corrupto o a medio escribir: mejor no mostrarlo que mostrar texto libre/markdown crudo.
+        if (!faseValida(fase) || /^closed$/i.test(fase)) continue;
         const mtime = fs.statSync(st).mtimeMs;
         if (!best || mtime > best.mtime) best = { name, fase, mtime };
       }
