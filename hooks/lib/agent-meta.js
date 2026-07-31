@@ -21,6 +21,21 @@ const configDir = process.env.CLAUDE_CONFIG_DIR || path.resolve(__dirname, '..',
 const RUNS_DIR = path.join(configDir, 'session-state', 'agent-runs');
 const OUT_DIR = path.join(configDir, 'session-state', 'agent-outputs');
 
+/**
+ * Enum cerrado de `## Current Phase` en `state.md` (contrato: sdd-artifact-protocol/SKILL.md).
+ * Cualquier sub-agente que escriba otra cosa ahi (texto libre, markdown, una fase a medio
+ * terminar) rompe el contrato — y sin este chequeo, session-title.js y statusline.js lo
+ * mostraban literal en la UI. Mejor ignorar la entrada que mostrar un dato corrupto.
+ */
+const FASES_SDD = new Set([
+  'explore', 'propose', 'spec', 'design', 'tasks', 'apply', 'verify', 'archive', 'closed',
+]);
+
+/** ¿`fase` es uno de los tokens que el protocolo permite en `Current Phase`? */
+function faseValida(fase) {
+  return FASES_SDD.has(String(fase || '').toLowerCase());
+}
+
 /** Indice { name -> { model, effort, color, file } } leyendo el frontmatter de agents/. */
 function cargarAgentes() {
   const dir = path.join(configDir, 'agents');
@@ -125,4 +140,5 @@ module.exports = {
   configDir, RUNS_DIR, OUT_DIR,
   cargarAgentes, modeloDe, etiqueta, duracion,
   familia, discrepa, fichaDe, leerFicha,
+  FASES_SDD, faseValida,
 };
