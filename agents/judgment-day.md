@@ -186,7 +186,15 @@ relanzar. Recién si ya no está Y pasó un tiempo razonable sin ninguna notific
 
 ### Cuando un juez no entrega — recuperación acotada
 
-Dos formas distintas de que un juez "no entregue", y las dos se recuperan igual:
+**Antes que nada, revisá el disco.** Cada `jd-judge` persiste su veredicto completo en
+`~/.claude/session-state/agent-outputs/jd-judge__{timestamp}.md` justo antes de responder (es su
+red de seguridad contra el bug de plataforma de abajo). `Glob` esa carpeta por `jd-judge__*.md`
+con timestamp posterior al lanzamiento de ese juez — **si el archivo está, ese es el veredicto
+real, usalo, no hay nada más que hacer.** Esto resuelve la mayoría de los casos sin relanzar nada
+y sin tener que grepear transcripts.
+
+Recién si el archivo NO está (el juez murió antes de llegar al `Write`, o directamente no llegó a
+correr), aplican las dos formas de "no entregó", y las dos se recuperan igual:
 
 **A) Veredicto inválido.** El agente terminó (`status: completed`) pero el mensaje final no es ni
 `VERDICT: CLEAN` ni una lista de hallazgos con Severidad/Clase/Archivo/Descripción/Fix, ni cierra
