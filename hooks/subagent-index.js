@@ -100,11 +100,18 @@ function main(p) {
   }
 
   // ------------------------------- 3. Una linea de vuelta al orquestador
-  const base = `✅ sub-agente ${etiqueta(agentType, declarado, real)} terminó${dur ? ` en ${dur}` : ''}.`;
+  //
+  // El agent_id es OBLIGATORIO en esta linea. Sin el, cuando corren varios sub-agentes del MISMO
+  // tipo en paralelo (el caso de fondo de Judgment Day: siempre 2+ jd-judge a la vez), esta linea
+  // decia literalmente "termino jd-judge[sonnet]" sin decir CUAL — indistinguible entre instancias,
+  // y el padre no tenia forma de correlacionar la notificacion con un agent_id especifico. Eso
+  // empujaba a tratar silencio + ambiguedad como "murio" y relanzar de mas.
+  const idCorto = agentId ? ` (${agentId})` : '';
+  const base = `✅ sub-agente ${etiqueta(agentType, declarado, real)}${idCorto} terminó${dur ? ` en ${dur}` : ''}.`;
 
   if (discrepa(declarado, real)) {
     return (
-      `⚠️ MODELO INESPERADO — ${agentType} declara \`model: ${declarado}\` en su frontmatter, ` +
+      `⚠️ MODELO INESPERADO — ${agentType}${idCorto} declara \`model: ${declarado}\` en su frontmatter, ` +
       `pero Claude Code lo corrió con \`${real}\` (familia ${familia(real)}). ` +
       `Terminó${dur ? ` en ${dur}` : ''}.\n` +
       'Revisá si el alias del frontmatter sigue existiendo o si hay un allowlist de modelos ' +

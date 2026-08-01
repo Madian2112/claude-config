@@ -102,6 +102,7 @@ settings.json             Modelo, permisos, hooks, statusline
 | `git-guard.js` | PreToolUse (Bash) | **Bloquea** `git commit/push/merge/rebase` en repos de proyecto. Exento el repo de config |
 | `precommit-validate.js` | PreToolUse (Bash) | **Bloquea** `git commit` en ESTE repo si `validate-config.js` falla. La config no se commitea rota |
 | `atl-only-guard.js` | PreToolUse — scoped a 8 sub-agentes | **Bloquea** escrituras fuera de `.atl/`. Enganchado por el campo `hooks:` del frontmatter, no global. Lo llevan todas las fases SDD **menos `sdd-apply`**, que es la única que escribe código de proyecto |
+| `judge-output-guard.js` | PreToolUse — scoped a `jd-judge` | **Bloquea** escrituras fuera de `session-state/agent-outputs/` (bajo la carpeta de config, no del proyecto). Le da a `jd-judge` un `Write` acotado solo para persistir su propio veredicto como backup — sigue sin poder tocar código |
 | `detect-subagent-model.js` | PostToolUse — scoped a los sub-agentes | Lee del transcript el modelo **real** que la plataforma asignó y lo compara con el declarado |
 | `auto-format.js` | PostToolUse (Edit·MultiEdit·Write) | `dotnet format` / `prettier` sobre el archivo tocado. No compila |
 | `session-title.js` | SessionStart | Nombra la sesión (la rama de trabajo) para que `/resume` muestre un título y no un pedazo de conversación |
