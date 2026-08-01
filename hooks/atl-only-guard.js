@@ -13,15 +13,24 @@
  * dejarselo sin guard deja la regla en prosa. La unica forma de expresar "solo dentro de .atl/"
  * es un hook que mire el path.
  *
+ * BUG REAL QUE ESTO ARREGLA: `sdd-artifact-protocol §3` le exige a TODO sub-agente `sdd-*`, sin
+ * excepcion de fase, persistir un backup de su output en `session-state/agent-outputs/` antes de
+ * responder. Ese directorio vive bajo la carpeta de CONFIGURACION, no bajo `.atl/` — asi que este
+ * guard bloqueaba exactamente lo que el protocolo le pedia hacer a los 8 agentes que lo llevan.
+ * Solo `sdd-apply` (sin este guard) podia cumplir esa parte del protocolo. Mismo destino que ya
+ * usa `judge-output-guard.js` para `jd-judge`.
+ *
  * Se engancha via el campo `hooks:` del frontmatter del sub-agente, asi que su alcance es la
  * vida del agente: en el hilo principal no existe.
  *
- * Falla ABIERTO ante lo inesperado, salvo cuando puede afirmar que el destino esta fuera de .atl/.
+ * Falla ABIERTO ante lo inesperado, salvo cuando puede afirmar que el destino esta fuera de los
+ * dos directorios permitidos.
  */
 
 'use strict';
 
 const path = require('path');
+const { OUT_DIR } = require('./lib/agent-meta');
 
 const CHUNKS = [];
 process.stdin.on('data', (c) => CHUNKS.push(c));
@@ -42,9 +51,13 @@ function main(payload) {
   // Resolvemos contra el cwd para que un path relativo no se escape, y normalizamos separadores
   // porque en Windows llegan con backslash.
   const abs = path.resolve(cwd, destino).replace(/\\/g, '/');
+  const outDir = OUT_DIR.replace(/\\/g, '/');
 
-  // Permitido: cualquier cosa bajo un directorio .atl/ (artifacts SDD, tech-debt tracker).
-  if (/(^|\/)\.atl\//i.test(abs)) process.exit(0);
+  // Permitido: cualquier cosa bajo un directorio .atl/ (artifacts SDD, tech-debt tracker) O bajo
+  // session-state/agent-outputs/ (backup de output — vive en la carpeta de config, no en el cwd).
+  const bajoAtl = /(^|\/)\.atl\//i.test(abs);
+  const bajoOutputs = abs === outDir || abs.startsWith(`${outDir}/`);
+  if (bajoAtl || bajoOutputs) process.exit(0);
 
   process.stdout.write(
     JSON.stringify({
@@ -52,13 +65,14 @@ function main(payload) {
         hookEventName: 'PreToolUse',
         permissionDecision: 'deny',
         permissionDecisionReason:
-          `❌ FASE DE SOLO LECTURA — este sub-agente no escribe fuera de \`.atl/\`.\n` +
-          `Destino rechazado: ${destino}\n\n` +
+          '❌ FASE DE SOLO LECTURA — este sub-agente no escribe fuera de `.atl/` o su backup de ' +
+          `output.\nDestino rechazado: ${destino}\n\n` +
           'Verificar es reportar, no corregir. Si encontraste algo para arreglar, va al reporte ' +
           'como CRITICAL / WARNING / SUGGESTION y lo corrige quien corresponda (sdd-apply o el ' +
           'humano). Arreglarlo vos mismo destruye la evidencia de que el codigo entregado estaba ' +
           'mal, y ademas te convierte en juez y parte.\n\n' +
-          'Salidas validas: `.atl/changes/{change}/verify-report.md` y `.atl/tech-debt.md`.',
+          'Salidas validas: `.atl/changes/{change}/*`, `.atl/tech-debt.md`, y tu propio backup en ' +
+          '`session-state/agent-outputs/{agent-type}__{timestamp}.md` (sdd-artifact-protocol §3).',
       },
     })
   );
