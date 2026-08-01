@@ -171,15 +171,32 @@ Esperá a que **los dos** terminen. Un veredicto parcial no es un veredicto.
 Los sospechosos se reportan pero **no se arreglan solos**: un hallazgo que un solo juez vio es,
 por definición, el caso donde el acuerdo independiente falló.
 
+### Antes de asumir que un juez murió: correlacioná por `agent_id`
+
+La notificación de `SubagentStop` (el hook que dice "✅ sub-agente jd-judge[...] terminó") ahora
+incluye el `agent_id` entre paréntesis. Usalo: con dos o más `jd-judge` corriendo en paralelo —el
+caso de fondo de Judgment Day, siempre—, una notificación sin ese ID es indistinguible entre
+instancias, y tratar silencio + ambigüedad como "murió" es lo que produce reintentos de más.
+
+Si tenés dudas sobre si un juez sigue vivo: mirá si `~/.claude/session-state/agent-runs/{agent_id}.json`
+todavía existe. **Existe → sigue en vuelo, no está muerto, solo lento.** Ese archivo lo cierra
+`SubagentStop` recién cuando el sub-agente termina de verdad; mientras esté ahí, no hay base para
+relanzar. Recién si ya no está Y pasó un tiempo razonable sin ninguna notificación con ese
+`agent_id`, hay motivo real para sospechar que algo se perdió.
+
 ### Cuando un juez no entrega — recuperación acotada
 
 Dos formas distintas de que un juez "no entregue", y las dos se recuperan igual:
 
 **A) Veredicto inválido.** El agente terminó (`status: completed`) pero el mensaje final no es ni
 `VERDICT: CLEAN` ni una lista de hallazgos con Severidad/Clase/Archivo/Descripción/Fix, ni cierra
-con `**Skill Resolution**`. Señales de que en realidad no hizo trabajo real: casi sin tool calls de
-lectura, output de pocos tokens, ningún artifact escrito. Tratalo como si no hubiera terminado —
-una respuesta vacía con `status: completed` NO es un veredicto.
+con `**Skill Resolution**`. Esto incluye el caso de **solo el conteo sin el detalle** ("5 CRITICAL,
+5 WARNING, 1 SUGGESTION") sin archivo/línea/descripción por hallazgo — es un patrón de falla de
+plataforma ya documentado (el resultado del sub-agente se trunca en el camino), y sin el detalle
+por hallazgo **no sirve para cruzar contra el otro juez**, que es el mecanismo entero de
+Judgment Day. Otras señales de que en realidad no hizo trabajo real: casi sin tool calls de
+lectura, output de pocos tokens, ningún artifact escrito. Tratalo como si no hubiera entregado —
+una respuesta con `status: completed` que no cumple el formato NO es un veredicto usable.
 
 **B) Falla de infraestructura.** El lanzamiento o el relanzamiento falla explícitamente por límite
 de cuota/rate limit de la API, o el agente muere sin producir nada.
