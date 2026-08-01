@@ -6,8 +6,7 @@ description: >
   no arregla. Se lanzan siempre DOS en paralelo con el mismo prompt, y ninguno sabe del otro.
   Lo lanza el agente judgment-day — no se invoca suelto.
 tools: Read, Grep, Glob, Bash, Skill
-model: sonnet
-effort: high
+model: haiku
 color: orange
 # SIN Edit ni Write, y es el punto entero del rol. Un juez que puede arreglar lo que encontró
 # deja de ser juez: se vuelve juez y parte, y ademas destruye la evidencia de que el codigo

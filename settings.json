@@ -141,6 +141,12 @@
             "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/session-title.js\"",
             "timeout": 10,
             "statusMessage": "Nombrando la sesion..."
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/session-sync.js\"",
+            "timeout": 20,
+            "statusMessage": "Reconciliando sesiones con el otro entorno..."
           }
         ]
       },
@@ -207,6 +213,22 @@
             "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/session-close-guard.js\"",
             "timeout": 15,
             "statusMessage": "Verificando el cierre de sesion de Engram..."
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/session-sync.js\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/session-sync.js\"",
+            "timeout": 10
           }
         ]
       }
