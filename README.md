@@ -110,6 +110,7 @@ settings.json             Modelo, permisos, hooks, statusline
 | `post-compact-memory.js` | SessionStart (`compact`) | Inyecta el protocolo AFTER COMPACTION de Engram apenas se compacta el contexto |
 | `session-close-guard.js` | Stop | Bloquea **una vez por sesión** si hubo escrituras y no se llamó a `mem_session_summary` |
 | `subagent-start.js` | SubagentStart | Abre la ficha del sub-agente en vuelo (tipo + **modelo** + inicio) que lee la statusline |
+| `notify-windows.js` | Notification (`permission_prompt`, `idle_prompt`) · SubagentStart | Toast de Windows vía `BurntToast` para desligarse del CLI: avisa cuando Claude queda esperando un permiso, cuando termina y espera el próximo mensaje, y cuando arranca un sub-agente. No-op fuera de Windows (`process.platform !== 'win32'`). Si `BurntToast` no está instalado, sale en silencio — nunca bloquea |
 | `subagent-index.js` | SubagentStop | Cierra la ficha, calcula duración, traza en `_index.jsonl` y **devuelve una línea al orquestador** |
 | `statusline.js` | statusLine | `proyecto · ‹sesión› · rama* · [modelo] · SDD:change→fase` — el segmento SDD **solo** aparece bajo `dev-orchestrator` (ver abajo) |
 | `validate-config.js` | manual | Valida la consistencia de toda la config — ver abajo |
