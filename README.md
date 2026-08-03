@@ -110,9 +110,86 @@ settings.json             Modelo, permisos, hooks, statusline
 | `post-compact-memory.js` | SessionStart (`compact`) | Inyecta el protocolo AFTER COMPACTION de Engram apenas se compacta el contexto |
 | `session-close-guard.js` | Stop | Bloquea **una vez por sesión** si hubo escrituras y no se llamó a `mem_session_summary` |
 | `subagent-start.js` | SubagentStart | Abre la ficha del sub-agente en vuelo (tipo + **modelo** + inicio) que lee la statusline |
+| `notify-desktop.js` | Notification (`permission_prompt`, `idle_prompt`) · SubagentStart | Notificación de escritorio multiplataforma para desligarse del CLI — ver sección "Notificaciones de escritorio" más abajo |
 | `subagent-index.js` | SubagentStop | Cierra la ficha, calcula duración, traza en `_index.jsonl` y **devuelve una línea al orquestador** |
 | `statusline.js` | statusLine | `proyecto · ‹sesión› · rama* · [modelo] · SDD:change→fase` — el segmento SDD **solo** aparece bajo `dev-orchestrator` (ver abajo) |
 | `validate-config.js` | manual | Valida la consistencia de toda la config — ver abajo |
+
+## Notificaciones de escritorio (`notify-desktop.js`)
+
+Engancha `Notification` (`permission_prompt`: Claude bloqueado esperando que apruebes algo;
+`idle_prompt`: Claude terminó y espera tu próximo mensaje) y `SubagentStart` (arrancó un sub-agente).
+El objetivo es poder desligarse del CLI sin quedar pendiente de la terminal.
+
+| Entorno | Mecanismo |
+|---|---|
+| Windows nativo | Toast vía `BurntToast` (PowerShell) |
+| WSL2 corriendo Claude Code **directo** (sin contenedor) | Mismo camino, invocando el `powershell.exe` del host vía interop |
+| macOS | `osascript -e 'display notification ...'` — nativo, sin dependencias |
+| Linux de escritorio | `notify-send` (libnotify) |
+| Claude Code **dentro de un contenedor Docker** (ej. WSL2 → `docker run` → Claude adentro) | Bridge de carpeta compartida + watcher de PowerShell — ver más abajo |
+
+**Requisito único, Windows/WSL2 directo:** `Install-Module -Name BurntToast -Scope CurrentUser -Force`
+en PowerShell, una sola vez. No hace falta admin.
+
+### Si falta una dependencia, no falla en silencio
+
+El hook detecta la ausencia de `BurntToast` (Windows/WSL2) o `notify-send` (Linux) y avisa **una sola
+vez por sesión** (marca en `session-state/notify-warnings/`, no versionado) con instrucciones exactas
+de qué instalar. Usa un exit code que no es `0` ni `2`, así el mensaje llega a la terminal sin activar
+el comportamiento de bloqueo de ningún evento.
+
+> **Ojo con quién puede instalar qué.** Esta sesión de Claude Code corre en un entorno remoto propio,
+> sin acceso a tu máquina real — no puede ejecutar `Install-Module` en tu Windows. Quien sí puede es
+> tu **Claude Code local** (el que corrés directo en tu PC/WSL), porque ese tiene una shell de verdad
+> ahí: pedile a ese "instalá BurntToast" y va a correr el comando por vos. La alternativa es correrlo
+> vos mismo.
+
+### Contenedor Docker dentro de WSL2 — bridge de carpeta compartida
+
+Si corrés `wsl` → `docker run` → Claude Code **adentro** del contenedor, ni el interop con
+`powershell.exe` ni `notify-send` tienen efecto ahí adentro: el contenedor no ve el escritorio de
+Windows. La solución es un bridge de archivos: el contenedor escribe un JSON chico en una carpeta
+montada desde Windows, y un watcher de PowerShell corriendo en el host la mira y dispara el toast.
+
+**1. Levantar el contenedor con el volumen montado** (desde WSL2, reemplazando `<TU_USUARIO_WINDOWS>`
+por tu usuario real de Windows — el que ves en `C:\Users\`, no necesariamente el mismo que en WSL):
+
+```bash
+docker run -v /mnt/c/Users/<TU_USUARIO_WINDOWS>/ClaudeNotify:/claude-notify \
+  ...el resto de tus flags de siempre... imagen
+```
+
+El path por default que espera `notify-desktop.js` adentro del contenedor es `/claude-notify`. Si
+montás en otro lado, seteá `CLAUDE_NOTIFY_BRIDGE_DIR` al levantar el contenedor
+(`-e CLAUDE_NOTIFY_BRIDGE_DIR=/otro/path`).
+
+**2. Correr el watcher del lado de Windows** — `hooks/windows/notify-bridge-watcher.ps1`. Primero
+probalo en primer plano para confirmar que aparecen los toasts:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\hooks\windows\notify-bridge-watcher.ps1"
+```
+
+Por default mira `$env:USERPROFILE\ClaudeNotify` (la misma carpeta del `-v` de arriba). Una vez
+confirmado, registralo como Tarea Programada para que arranque solo al iniciar sesión y quede
+corriendo en segundo plano (instrucciones completas con `Get-Help` del script, o en su docstring):
+
+```powershell
+$scriptPath = "$env:USERPROFILE\.claude\hooks\windows\notify-bridge-watcher.ps1"
+$action  = New-ScheduledTaskAction -Execute 'powershell.exe' `
+    -Argument "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$scriptPath`""
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+Register-ScheduledTask -TaskName 'ClaudeNotifyBridgeWatcher' -Action $action -Trigger $trigger `
+    -Description 'Watcher de notificaciones de Claude Code (Docker/WSL2 bridge)'
+```
+
+Si el volumen no está montado (o no se puede escribir ahí), `notify-desktop.js` avisa una sola vez
+por sesión en vez de fallar en silencio, con el mismo comando de arriba como recordatorio.
+
+> **Sin probar en Windows real.** Este script se escribió y revisó a mano en un sandbox Linux sin
+> PowerShell disponible — no se pudo ejecutar ni un chequeo de sintaxis automático. Probalo vos en
+> primer plano (paso 1 de arriba) antes de confiar en la Tarea Programada para el día a día.
 
 ## MCP: Playwright — probar formularios contra una API real
 
