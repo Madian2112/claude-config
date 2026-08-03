@@ -168,7 +168,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/notify-windows.js\"",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/notify-desktop.js\"",
             "timeout": 10
           }
         ]
@@ -178,7 +178,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/notify-windows.js\"",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/notify-desktop.js\"",
             "timeout": 10
           }
         ]
@@ -265,7 +265,7 @@
           },
           {
             "type": "command",
-            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/notify-windows.js\"",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/notify-desktop.js\"",
             "timeout": 10
           }
         ]
