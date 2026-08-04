@@ -2,7 +2,13 @@
 
 /**
  * Notificacion de escritorio multiplataforma para poder desligarse del CLI.
- * Cubre: Notification (permission_prompt, idle_prompt) y SubagentStart.
+ * Cubre: Notification (permission_prompt), SubagentStart y Stop.
+ *
+ * El evento Stop dispara al final de CADA respuesta del agente, sin filtrar por
+ * foco de ventana: es una decision explicita del usuario (ver README). Va
+ * configurado con "async": true en settings.json para no sumarle latencia al
+ * turno. Reemplaza al matcher idle_prompt, que avisaba de lo mismo pero recien
+ * despues del delay de inactividad — tenerlos juntos daba doble toast.
  *
  * Caminos soportados:
  * - Windows nativo: toast via BurntToast (PowerShell).
@@ -72,13 +78,15 @@ function buildMessage(input) {
         body: input.message || 'Necesita que apruebes una accion',
       };
     }
-    if (input.notification_type === 'idle_prompt') {
-      return {
-        title: 'Claude Code — esperando',
-        body: 'Termino de responder y espera tu proximo mensaje',
-      };
-    }
     return { title: 'Claude Code', body: input.message || 'Notificacion' };
+  }
+
+  if (event === 'Stop') {
+    const project = input.cwd ? path.basename(input.cwd) : null;
+    return {
+      title: project ? `Claude Code — ${project}` : 'Claude Code',
+      body: 'Termino de responder y espera tu proximo mensaje',
+    };
   }
 
   if (event === 'SubagentStart') {
@@ -133,13 +141,17 @@ function warnOnce(sessionId, key, text) {
   console.error(text);
 }
 
+const APP_LOGO_PATH = path.join(configDir, 'images', 'claudecode-color.png');
+
 function fireToastPowerShell(powershellExe, message) {
   const title = forPowerShellSingleQuoted(message.title);
   const body = forPowerShellSingleQuoted(message.body);
+  const hasLogo = fs.existsSync(APP_LOGO_PATH);
+  const appLogoArg = hasLogo ? ` -AppLogo '${forPowerShellSingleQuoted(APP_LOGO_PATH)}'` : '';
   const psScript = [
     "$ErrorActionPreference = 'SilentlyContinue'",
     'Import-Module BurntToast',
-    `New-BurntToastNotification -Text '${title}', '${body}'`,
+    `New-BurntToastNotification -Text '${title}', '${body}'${appLogoArg}`,
   ].join('; ');
 
   const child = spawn(powershellExe, ['-NoProfile', '-NonInteractive', '-Command', psScript], {

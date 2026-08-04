@@ -1,31 +1,11 @@
 {
-  "model": "sonnet",
-  "effortLevel": "medium",
-  "theme": "dark",
-  "includeCoAuthoredBy": false,
-  "alwaysThinkingEnabled": true,
-  "enableAllProjectMcpServers": true,
-
   "env": {
     "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "3"
   },
-
-  "extraKnownMarketplaces": {
-    "claude-plugins-official": {
-      "source": {
-        "source": "github",
-        "repo": "anthropics/claude-plugins-official"
-      }
-    }
-  },
-
-  "enabledPlugins": {},
-
+  "includeCoAuthoredBy": false,
   "permissions": {
-    "defaultMode": "default",
     "allow": [
       "mcp__engram__*",
-
       "mcp__playwright__browser_snapshot",
       "mcp__playwright__browser_find",
       "mcp__playwright__browser_console_messages",
@@ -53,7 +33,6 @@
       "mcp__playwright__browser_tabs",
       "mcp__playwright__browser_handle_dialog",
       "mcp__playwright__browser_close",
-
       "Read(**/*.cs)",
       "Read(**/*.ts)",
       "Read(**/*.html)",
@@ -72,6 +51,26 @@
       "Bash(npx ng test:*)",
       "Bash(npx prettier:*)",
       "Bash(npx eslint:*)"
+    ],
+    "deny": [
+      "mcp__playwright__browser_run_code_unsafe",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/appsettings.Development.json)",
+      "Read(**/appsettings.Production.json)",
+      "Read(**/appsettings.Local.json)",
+      "Read(**/secrets/**)",
+      "Read(**/*.pfx)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/*.publishsettings)",
+      "Read(**/.git/config)",
+      "Read(**/id_rsa)",
+      "Read(**/.npmrc)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean -fd:*)"
     ],
     "ask": [
       "Bash(git commit:*)",
@@ -98,34 +97,10 @@
       "Write(**/*.yaml)",
       "Edit(**/*.yaml)"
     ],
-    "deny": [
-      "mcp__playwright__browser_run_code_unsafe",
-      "Read(**/.env)",
-      "Read(**/.env.*)",
-      "Read(**/appsettings.Development.json)",
-      "Read(**/appsettings.Production.json)",
-      "Read(**/appsettings.Local.json)",
-      "Read(**/secrets/**)",
-      "Read(**/*.pfx)",
-      "Read(**/*.pem)",
-      "Read(**/*.key)",
-      "Read(**/*.publishsettings)",
-      "Read(**/.git/config)",
-      "Read(**/id_rsa)",
-      "Read(**/.npmrc)",
-      "Bash(git push --force:*)",
-      "Bash(git push -f:*)",
-      "Bash(git reset --hard:*)",
-      "Bash(git clean -fd:*)"
-    ]
+    "defaultMode": "default"
   },
-
-  "statusLine": {
-    "type": "command",
-    "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/statusline.js\"",
-    "refreshInterval": 15
-  },
-
+  "model": "sonnet",
+  "enableAllProjectMcpServers": true,
   "hooks": {
     "SessionStart": [
       {
@@ -165,16 +140,6 @@
     "Notification": [
       {
         "matcher": "permission_prompt",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/notify-desktop.js\"",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "matcher": "idle_prompt",
         "hooks": [
           {
             "type": "command",
@@ -240,6 +205,12 @@
             "type": "command",
             "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/session-sync.js\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/notify-desktop.js\"",
+            "timeout": 10,
+            "async": true
           }
         ]
       }
@@ -282,5 +253,22 @@
         ]
       }
     ]
-  }
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/statusline.js\"",
+    "refreshInterval": 15
+  },
+  "enabledPlugins": {},
+  "extraKnownMarketplaces": {
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
+    }
+  },
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "medium",
+  "theme": "dark"
 }
