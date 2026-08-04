@@ -143,6 +143,12 @@ function warnOnce(sessionId, key, text) {
 
 const APP_LOGO_PATH = path.join(configDir, 'images', 'claudecode-color.png');
 
+// AppUserModelID propio, registrado con un shortcut en el Start Menu (ver
+// hooks/windows/setup-notify-identity.ps1) para que Windows muestre "Claude
+// Code" con su icono en vez del generico "Windows PowerShell", y se pueda
+// priorizar por separado en Enfoque asistido.
+const APP_USER_MODEL_ID = 'ClaudeCode.Notify';
+
 function fireToastPowerShell(powershellExe, message) {
   const title = forPowerShellSingleQuoted(message.title);
   const body = forPowerShellSingleQuoted(message.body);
@@ -150,6 +156,8 @@ function fireToastPowerShell(powershellExe, message) {
   const appLogoArg = hasLogo ? ` -AppLogo '${forPowerShellSingleQuoted(APP_LOGO_PATH)}'` : '';
   const psScript = [
     "$ErrorActionPreference = 'SilentlyContinue'",
+    "Add-Type -MemberDefinition '[DllImport(\"shell32.dll\", CharSet = CharSet.Unicode)] public static extern int SetCurrentProcessExplicitAppUserModelID(string AppID);' -Namespace ClaudeNotify -Name Aumid",
+    `[ClaudeNotify.Aumid]::SetCurrentProcessExplicitAppUserModelID('${APP_USER_MODEL_ID}')`,
     'Import-Module BurntToast',
     `New-BurntToastNotification -Text '${title}', '${body}'${appLogoArg}`,
   ].join('; ');
