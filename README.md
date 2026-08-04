@@ -88,6 +88,7 @@ agents/                   dev-orchestrator + los 9 sub-agentes del flujo SDD
 skills/                   Ecosistema de skills (stack, metodología e invocables)
   SKILL-REGISTRY.md       Cheat-sheet humano + compact rules de las skills de STACK
 hooks/                    Enforcement en Node.js
+  windows/                Scripts para el lado Windows del bridge Docker/WSL2 (ver Notificaciones)
 mcp/                      Definiciones reproducibles de los MCP servers
   engram.json             Memoria persistente
   playwright.json         Navegador real para probar formularios contra una API
