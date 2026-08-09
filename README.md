@@ -111,6 +111,7 @@ settings.json             Modelo, permisos, hooks, statusline
 | `session-close-guard.js` | Stop | Bloquea **una vez por sesión** si hubo escrituras y no se llamó a `mem_session_summary` |
 | `subagent-start.js` | SubagentStart | Abre la ficha del sub-agente en vuelo (tipo + **modelo** + inicio) que lee la statusline |
 | `notify-desktop.js` | Notification (`permission_prompt`, `idle_prompt`) · SubagentStart | Notificación de escritorio multiplataforma para desligarse del CLI — ver sección "Notificaciones de escritorio" más abajo |
+| `notify-telegram.js` | Stop | Aviso al celular vía Telegram Bot API cuando el agente termina de responder. Canal **independiente** del de escritorio, no lo reemplaza — ver sección "Notificaciones a Telegram" más abajo |
 | `subagent-index.js` | SubagentStop | Cierra la ficha, calcula duración, traza en `_index.jsonl` y **devuelve una línea al orquestador** |
 | `statusline.js` | statusLine | `proyecto · ⎇ rama* · [modelo] · @agente` — no repite el nombre de la sesión (lo dibuja el CLI arriba del input) ni la fase SDD (ver abajo) |
 | `validate-config.js` | manual | Valida la consistencia de toda la config — ver abajo |
@@ -190,6 +191,137 @@ por sesión en vez de fallar en silencio, con el mismo comando de arriba como re
 > **Sin probar en Windows real.** Este script se escribió y revisó a mano en un sandbox Linux sin
 > PowerShell disponible — no se pudo ejecutar ni un chequeo de sintaxis automático. Probalo vos en
 > primer plano (paso 1 de arriba) antes de confiar en la Tarea Programada para el día a día.
+
+## Notificaciones a Telegram (`notify-telegram.js`)
+
+El bridge de escritorio resuelve "avisame **en esta máquina**". Telegram resuelve el caso que el
+bridge no puede: **estar lejos de la máquina**. Un `sdd-design` con Opus o una ronda de Judgment Day
+tardan lo suficiente como para que te levantes; el toast queda parpadeando en una pantalla que no
+estás mirando.
+
+Son **canales independientes que corren en paralelo**. Uno no reemplaza al otro y no comparten
+código: `notify-desktop.js` escribe en el sistema operativo, `notify-telegram.js` hace un POST a
+`api.telegram.org`. Si el bridge de Docker no está montado, Telegram igual te llega.
+
+| | `notify-desktop.js` | `notify-telegram.js` |
+|---|---|---|
+| Evento | `Notification` · `SubagentStart` | `Stop` |
+| Adónde llega | La máquina donde corre el CLI | Tu celular, esté donde esté |
+| Dependencias | BurntToast / `notify-send` / `osascript` | Ninguna — `node:https` y nada más |
+| Necesita red | No | Sí |
+
+### El evento `Stop`: leelo antes de engancharlo
+
+`Stop` dispara **cada vez que el agente termina de responder**, no cuando termina "la tarea". En una
+conversación de veinte idas y vueltas te van a llegar veinte mensajes. Está bien si trabajás como
+yo —tirás un `dev-orchestrator` a laburar y te vas—; es insoportable si usás el CLI de forma
+conversacional.
+
+Si sos de los segundos, la alternativa honesta es engancharlo a `SubagentStop` (te avisa cuando
+cierra una fase, no cada turno) o a `Notification` con matcher `permission_prompt` (solo cuando
+está bloqueado esperándote). Es cambiar la clave en `settings.json`, el hook no asume su evento:
+
+```json
+"Stop": [
+  {
+    "hooks": [
+      {
+        "type": "command",
+        "command": "node \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/notify-telegram.js\"",
+        "shell": "bash",
+        "timeout": 10
+      }
+    ]
+  }
+]
+```
+
+### Setup — tres pasos, una sola vez
+
+**1. Crear el bot y sacar el token.** En Telegram, hablale a
+[@BotFather](https://t.me/BotFather) → `/newbot` → nombre y username. Te devuelve un token con
+forma `123456789:AAE...`. Ese es tu `TELEGRAM_BOT_TOKEN`.
+
+**2. Sacar tu `chat_id`.** Acá está el paso que todo el mundo se saltea: **un bot de Telegram no
+puede escribirle primero a nadie.** Mandale cualquier mensaje a tu bot desde tu cuenta (un "hola"
+alcanza) y recién después:
+
+```bash
+curl -s "https://api.telegram.org/bot<TU_TOKEN>/getUpdates" | grep -o '"chat":{"id":[-0-9]*'
+```
+
+El número que sale es tu `TELEGRAM_CHAT_ID`. Si `getUpdates` devuelve `{"ok":true,"result":[]}`, es
+que todavía no le mandaste ese primer mensaje — no es que el token esté mal.
+
+**3. Inyectar las dos variables al entorno donde corre Claude Code.** Depende de cómo lo corras:
+
+| Cómo corrés Claude Code | Dónde van las variables |
+|---|---|
+| Contenedor Docker (mi caso) | `env_file` en el `docker-compose.yml`, apuntando a un `.env` que vive **junto al compose, fuera del repo** |
+| Directo en WSL2 / Linux / macOS | `export` en tu `~/.bashrc` o `~/.zshrc` |
+| Windows nativo | `[Environment]::SetEnvironmentVariable('TELEGRAM_BOT_TOKEN','...','User')` |
+
+Para el caso Docker, el compose queda así:
+
+```yaml
+services:
+  claude:
+    env_file:
+      - .env          # TELEGRAM_BOT_TOKEN=... y TELEGRAM_CHAT_ID=... — NUNCA versionado
+    volumes:
+      - ./claude-config:/root/.claude
+      - /mnt/c/Users/<TU_USUARIO_WINDOWS>/ClaudeNotify:/claude-notify
+```
+
+> **Por qué no vas a encontrar `docker/` en este repo.** Está en `.gitignore`, y es a propósito: el
+> `.env` con el token vive al lado del compose. La carpeta existe en mi máquina y **no debe existir
+> en el repo**. Si clonás esto, el compose lo armás vos con el snippet de arriba.
+
+### Las credenciales NO van en `settings.json`
+
+Existe la tentación, porque `settings.json` tiene un bloque `env` y funcionaría:
+
+```jsonc
+// ❌ NO HAGAS ESTO
+"env": {
+  "TELEGRAM_BOT_TOKEN": "123456789:AAE..."
+}
+```
+
+**`settings.json` está versionado.** Un token ahí es un token en el historial de git, y un secreto
+que estuvo en git ya está comprometido — la skill `dotnet-api-security` dice exactamente eso, y no
+vale escribirla para los proyectos ajenos y romperla en la propia config. Si te pasa: revocá el bot
+con `/revoke` en BotFather, no alcanza con borrar el commit.
+
+Ese bloque `env` es para configuración **no sensible** (ahí vive `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`).
+Los secretos entran por el entorno del proceso, que no se versiona.
+
+### Fail-open: nunca bloquea ni retrasa
+
+El hook está escrito para desaparecer cuando algo falla, porque un aviso es un lujo y el CLI es el
+trabajo:
+
+- **Faltan las credenciales** → avisa **una sola vez por sesión** (marca en
+  `session-state/notify-warnings/`, no versionado, mismo patrón que `notify-desktop.js`) y sale con
+  exit code `1`. No es `0` ni `2` a propósito: el mensaje llega a la terminal sin activar el
+  comportamiento de bloqueo de `Stop`.
+- **No hay red, o Telegram tarda** → timeout de 8 segundos, `req.destroy()`, sigue de largo.
+- **Telegram responde algo que no es `200`** → avisa una vez por sesión con el status recibido.
+- **El stdin viene roto** → `exit(0)` sin chistar.
+
+En ningún camino el hook devuelve un exit code que frene al agente.
+
+### Probarlo sin esperar a que termine un agente
+
+```bash
+TELEGRAM_BOT_TOKEN=... TELEGRAM_CHAT_ID=... \
+  echo '{"cwd":"/home/vos/erp-facturacion","session_id":"test"}' \
+  | node hooks/notify-telegram.js
+```
+
+Si llega `Claude Code — erp-facturacion`, está andando. El nombre del proyecto sale de
+`basename(cwd)`, así que el aviso te dice **en qué repo** terminó — con tres contenedores abiertos,
+ese detalle es la diferencia entre un aviso útil y una vibración más.
 
 ## MCP: Playwright — probar formularios contra una API real
 

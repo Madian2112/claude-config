@@ -58,14 +58,15 @@ skills de las slides 4/5/6, los 5 hooks de la slide 9, y **los 8 modelos por fas
 **Lo que el carrusel todavía no cuenta** — las notificaciones, que son el 80% de los commits
 nuevos y hoy no aparecen en ninguna slide ni en el copy. Ver la slide opcional más abajo.
 
-**Antes de publicar, dos cabos sueltos del repo** (el post promete "comentá CONFIG y te paso el
-repo", así que quien entre los ve):
+**Cabo suelto detectado y ya cerrado:** `notify-telegram.js` no estaba documentado en el README
+(era el único hook sin fila en la tabla). Se le agregó su fila y una sección propia con el setup
+completo. Importa porque el post promete "comentá CONFIG y te paso el repo": el primero que clone
+entra por el README.
 
-1. `notify-telegram.js` **no está documentado en el README**. Todos los demás hooks tienen su fila
-   en la tabla de Hooks; este no.
-2. Su docstring referencia `docker/docker-compose.yml`, y **esa carpeta no existe en el repo**.
-
-Ninguno de los dos rompe el carrusel. Los dos rompen la primera impresión de quien clona.
+> Sobre `docker/docker-compose.yml`, que el hook referenciaba y no está en el repo: **no es un
+> error**, está en `.gitignore` a propósito porque el `.env` con el token del bot vive al lado. Lo
+> que faltaba era decirlo. Ahora el README trae el snippet del compose para que cada uno arme el
+> suyo.
 
 ---
 

@@ -5,9 +5,14 @@
  * el agente termina de responder). Pensada como canal independiente del bridge
  * de escritorio (notify-desktop.js) — no lo reemplaza, corre en paralelo.
  *
- * Credenciales: NUNCA hardcodeadas aca ni en settings.json. Llegan por env vars
- * (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID) inyectadas por docker-compose desde un
- * .env que vive junto al compose REAL en WSL (fuera del repo). Ver docker/docker-compose.yml.
+ * Credenciales: NUNCA hardcodeadas aca ni en settings.json (ese archivo SE VERSIONA).
+ * Llegan por env vars (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID) inyectadas al entorno
+ * del proceso. En mi setup las pone docker-compose desde un .env que vive junto al
+ * compose REAL en WSL, fuera del repo — la carpeta docker/ esta en .gitignore a
+ * proposito, asi que NO la vas a encontrar clonando esto.
+ *
+ * Setup completo (crear el bot, sacar el chat_id, inyectar las vars segun como
+ * corras Claude Code): README.md, seccion "Notificaciones a Telegram".
  *
  * Fail-open: si faltan credenciales, si no hay red, o si Telegram devuelve error,
  * el hook nunca bloquea ni retrasa a Claude Code. Avisa una sola vez por sesion
